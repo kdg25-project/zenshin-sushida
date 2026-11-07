@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "zenshin-sushida",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-15",
+  "assets": {
+    "directory": "./out",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zenshin-sushida-rankings",
+      "database_id": "a9653345-e07e-43c1-b6e5-d249275844be",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

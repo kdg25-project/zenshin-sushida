@@ -1,0 +1,8 @@
+// Copy to wrangler.production.jsonc after creating the D1 database. Do not deploy with the local development id.
+{
+  "name": "zenshin-sushida",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-15",
+  "assets": { "directory": "./out", "run_worker_first": ["/api/*"] },
+  "d1_databases": [{ "binding": "DB", "database_name": "zenshin-sushida-rankings", "database_id": "PASTE_D1_ID_FROM_CF_D1_CREATE", "migrations_dir": "migrations" }]
+}

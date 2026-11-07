@@ -1,0 +1,3 @@
+import { describe, expect, it } from "vitest";
+import { resolveCameraCta } from "./camera-cta";
+describe("camera preparation CTA", () => { it("allows camera start, disables only during start, and then starts the game", () => { expect(resolveCameraCta({simulation:false,calibrated:false,starting:false,hasName:true})).toMatchObject({action:"start-camera",disabled:false}); expect(resolveCameraCta({simulation:false,calibrated:false,starting:true,hasName:true})).toMatchObject({disabled:true}); expect(resolveCameraCta({simulation:false,calibrated:true,starting:false,hasName:true})).toMatchObject({action:"start-game",disabled:false}); }); });

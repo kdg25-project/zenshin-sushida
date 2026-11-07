@@ -1,0 +1,1 @@
+ALTER TABLE game_sessions ADD COLUMN target_seed INTEGER NOT NULL DEFAULT 1;

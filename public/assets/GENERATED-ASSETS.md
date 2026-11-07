@@ -1,0 +1,16 @@
+# Generated game artwork
+
+Generated with the built-in `image_gen` tool for this project. Both images retain transparent RGBA backgrounds. These are original game assets, not assets copied from another game.
+
+## Saved assets
+
+- `public/assets/sushi-atlas-v2.png`: 1774 x 887, four columns by two rows. MAGURO, TAMAGO, EBI, IKA / IKURA, UNI, TAKO, SABA.
+- `public/assets/title-wordmark-v2.png`: 2172 x 724, original Japanese brush title.
+
+## Sushi atlas prompt
+
+Use case: stylized-concept. Asset type: one production-ready transparent 2D sushi sprite atlas for a Japanese retro browser typing game. Create ONE image as an exact 4-column by 2-row evenly spaced grid on a genuine transparent RGBA background. Desired landscape ratio 2:1. Each of the 8 equal cells contains exactly ONE isolated sushi on a small white ceramic oval plate with a thin vermilion-red double rim. Read order top row: MAGURO tuna nigiri, TAMAGO egg nigiri with nori band, EBI shrimp nigiri, IKA squid nigiri. Bottom row: IKURA salmon roe gunkan, UNI sea urchin gunkan, TAKO octopus nigiri, SABA mackerel nigiri. No text, no labels, no letters, no grid lines, no background or table. Consistent 2D hand-painted Japanese game sprite illustration, appetizing detailed food drawing, crisp dark warm outlines, lush tuna marbling and shrimp banding, distinct translucent seafood, individually suggested rice grains, tiny cel highlights. Shallow side/front three-quarter illustrated view as a flat sprite, NOT a 3D rendered object, NOT isometric, NOT pixel art, NOT geometric placeholder icons. The same plate scale, orientation and light source in every cell. Plate and sushi together occupy the middle 78 percent of each cell width and middle 70 percent height, with generous fully transparent padding on all four sides so runtime can sample each cell separately. Entire sprites remain wholly inside their cells with no crossing or overlap. Premium polished arcade art with warm ivory, vermilion, wasabi olive and deep seaweed black. Only eight plates, each with one sushi. No logos or watermark.
+
+## Title prompt
+
+Use case: logo-brand. Asset type: original transparent 2D title wordmark for a Japanese body-controlled sushi typing browser game. Exact Japanese text only: 「全身寿司打」. Spell five characters exactly in this left-to-right order: 全 身 寿 司 打. Draw one single horizontal line of beautiful bold black sumi ink brush calligraphy, energetic but highly readable Japanese strokes with slight natural ink edge variation, traditional sushi-shop game title feel, balanced compact spacing. Wide composition around 3:1 aspect ratio with transparent padding. Genuine transparent RGBA background. This is a flat 2D brush-lettering graphic, not text on a sign, not on paper, not a 3D render, no perspective or depth, no glow or drop shadow. Pure black ink lettering with a tiny warm vermilion accent stroke under the final character if composition needs it; otherwise no extra imagery. No food, no English, no subtitles, no seal text, no watermark, no borrowed brand. All five characters fully inside the frame, no clipping.

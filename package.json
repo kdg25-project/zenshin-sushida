@@ -1,0 +1,40 @@
+{
+  "name": "zenshin-sushida",
+  "type": "module",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run d1:migrate:local && npm run build && npm run dev:worker",
+    "dev:ui": "next dev",
+    "build": "next build",
+    "start": "npm run dev:worker",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:api": "vitest run worker/api.test.ts",
+    "dev:worker": "wrangler dev --config wrangler.local.jsonc --local --persist-to .local-state",
+    "d1:migrate:local": "wrangler d1 migrations apply DB --config wrangler.local.jsonc --local --persist-to .local-state",
+    "d1:migrate:remote": "wrangler d1 migrations apply zenshin-sushida-rankings --remote --config wrangler.jsonc",
+    "deploy:worker": "wrangler deploy --config wrangler.jsonc",
+    "deploy:production": "npm run build && npm run d1:migrate:remote && npm run deploy:worker"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.1.1",
+    "next": "15.5.28",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9",
+    "@types/three": "0.187.0",
+    "miniflare": "^3.20250718.3",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4",
+    "wrangler": "4.151.0"
+  }
+}
