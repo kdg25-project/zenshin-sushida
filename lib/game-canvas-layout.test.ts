@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { canvasBackingRect, containVideo, cssRect, displayBonePoint, fitGameViewport, fitTargetPose, gameRects, hudSnapshotKey, portraitGameRects, truncateCanvasText, wrapCanvasText } from "./game-canvas-layout";
+import { GAME_HEIGHT, GAME_WIDTH, type Rect, canvasBackingRect, containVideo, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, hudSnapshotKey, portraitGameRects, rectsOverlap, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
 import { POSE_TEMPLATES } from "./pose";
+import { SUSHI_WORDS } from "./sushi-words";
 
 describe("game canvas layout", () => {
   it("keeps canvas controls and DOM hit areas on the same letterboxed rects", () => {
@@ -69,8 +70,8 @@ describe("game canvas layout", () => {
 
   it("fits video and mirrors raw anatomy once, while target coordinates stay canonical", () => {
     const video = containVideo(gameRects.camera, 16 / 9);
-    expect(video.width).toBeCloseTo(499.5556);
-    expect(displayBonePoint({ x: 0.8, y: 0.25 }, video)).toEqual({ x: expect.closeTo(170.1333), y: expect.closeTo(370.25) });
+    expect(video.width).toBeCloseTo(480);
+    expect(displayBonePoint({ x: 0.8, y: 0.25 }, video)).toEqual({ x: expect.closeTo(191), y: expect.closeTo(192.5) });
     // A canonical target point at positive X stays on the viewer's right.
     expect(600 + 0.4 * 120).toBeGreaterThan(600);
   });
@@ -88,6 +89,89 @@ describe("game canvas layout", () => {
     expect(cssRect(portraitGameRects.menuCamera, viewport).height).toBeGreaterThanOrEqual(44);
     expect(cssRect(portraitGameRects.menuPractice, viewport).height).toBeGreaterThanOrEqual(44);
     expect(viewport.logicalWidth).toBe(600);
+  });
+
+  it("keeps the pose-list menu control inside both canvases and touch-sized", () => {
+    for (const [rect, width, height, compact] of [[gameRects.menuPoseList, GAME_WIDTH, GAME_HEIGHT, false], [portraitGameRects.menuPoseList, 390, 844, true]] as const) {
+      const viewport = fitGameViewport(width, height, compact), rendered = cssRect(rect, viewport);
+      expect(rendered.width).toBeGreaterThanOrEqual(44);
+      expect(rendered.height).toBeGreaterThanOrEqual(44);
+      expect(rendered.left).toBeGreaterThanOrEqual(viewport.x);
+      expect(rendered.left + rendered.width).toBeLessThanOrEqual(viewport.x + viewport.width);
+      expect(rendered.top).toBeGreaterThanOrEqual(viewport.y);
+      expect(rendered.top + rendered.height).toBeLessThanOrEqual(viewport.y + viewport.height);
+    }
+  });
+
+  it("uses the 16:9 desktop reference without stretching hit targets", () => {
+    const viewport = fitGameViewport(GAME_WIDTH, GAME_HEIGHT);
+    expect(GAME_WIDTH / GAME_HEIGHT).toBeCloseTo(16 / 9);
+    expect(viewport.scale).toBe(1);
+    expect(cssRect(gameRects.menuCamera, viewport).height).toBe(gameRects.menuCamera.height);
+  });
+
+  it("uses one stable viewport-width predicate at the responsive boundaries", () => {
+    expect(gameLayoutModeForWidth(390)).toBe("portrait");
+    expect(gameLayoutModeForWidth(560)).toBe("portrait");
+    expect(gameLayoutModeForWidth(767)).toBe("portrait");
+    expect(gameLayoutModeForWidth(768)).toBe("landscape");
+    expect(gameLayoutModeForWidth(1280)).toBe("landscape");
+    // A height-capped host must not be allowed to change the viewport's chosen orientation.
+    expect(gameLayoutModeForWidth(1280)).toBe("landscape");
+  });
+
+  it("keeps the reference bands in order and all play feedback inside the desktop canvas", () => {
+    expect(desktopScene.header.y + desktopScene.header.height).toBeLessThanOrEqual(desktopScene.conveyor.y);
+    expect(desktopScene.conveyor.y + desktopScene.conveyor.height).toBeLessThanOrEqual(desktopScene.navyBoard.y);
+    expect(desktopScene.navyBoard.y + desktopScene.navyBoard.height).toBeLessThanOrEqual(desktopScene.counter.y);
+    expect(desktopScene.waveLeft.y + desktopScene.waveLeft.height).toBeLessThanOrEqual(desktopScene.navyBoard.y + desktopScene.navyBoard.height);
+    expect(desktopScene.waveRight.y + desktopScene.waveRight.height).toBeLessThanOrEqual(desktopScene.navyBoard.y + desktopScene.navyBoard.height);
+    expect(desktopScene.playGuide.y + desktopScene.playGuide.height).toBeLessThanOrEqual(desktopScene.playFeedback.y);
+    expect(desktopScene.playCamera.y + desktopScene.playCamera.height).toBeLessThanOrEqual(desktopScene.playFeedback.y);
+    expect(desktopScene.playFeedback.y + desktopScene.playFeedback.height).toBeLessThanOrEqual(GAME_HEIGHT);
+  });
+
+  it("keeps HUD cards between the lanterns and free of collisions", () => {
+    const cards = [desktopScene.hudScore, desktopScene.hudTimer, desktopScene.hudCombo, desktopScene.hudPlates];
+    for (const card of cards) {
+      expect(card.x).toBeGreaterThanOrEqual(desktopScene.hudLeftLantern.x + desktopScene.hudLeftLantern.width);
+      expect(card.x + card.width).toBeLessThanOrEqual(desktopScene.hudRightLantern.x);
+    }
+    for (let index = 0; index < cards.length; index++) for (let other = index + 1; other < cards.length; other++) expect(rectsOverlap(cards[index]!, cards[other]!)).toBe(false);
+  });
+
+  it("keeps calibration panels, message, and desktop controls disjoint", () => {
+    const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+    expect(overlaps(desktopScene.calibrationCamera, desktopScene.calibrationGuide)).toBe(false);
+    expect(overlaps(desktopScene.calibrationCamera, desktopScene.calibrationMessage)).toBe(false);
+    expect(overlaps(desktopScene.calibrationGuide, desktopScene.calibrationMessage)).toBe(false);
+    expect(desktopScene.calibrationMessage.y + desktopScene.calibrationMessage.height).toBeLessThan(gameRects.calibrationStart.y);
+    expect(gameRects.calibrationStart.y + gameRects.calibrationStart.height).toBeLessThanOrEqual(GAME_HEIGHT);
+    expect(gameRects.calibrationBack.y + gameRects.calibrationBack.height).toBeLessThanOrEqual(GAME_HEIGHT);
+  });
+
+  it("keeps desktop action hit areas and long-word tiles within the reference scene", () => {
+    for (const rect of [gameRects.menuCamera, gameRects.menuPractice, gameRects.menuRanking, gameRects.menuPoseList, gameRects.gameSkip, gameRects.resultRetry, gameRects.resultMenu, gameRects.rankingBack, gameRects.rankingRefresh]) {
+      expect(rect.x).toBeGreaterThanOrEqual(0); expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(GAME_WIDTH); expect(rect.y + rect.height).toBeLessThanOrEqual(GAME_HEIGHT);
+    }
+    const tekkaMakiLetters = 10, gap = 13, maxTile = (desktopScene.letters.width - gap * (tekkaMakiLetters - 1)) / tekkaMakiLetters;
+    expect(maxTile).toBeGreaterThanOrEqual(80);
+    expect(desktopScene.letters.height).toBeGreaterThanOrEqual(126);
+  });
+
+  it("fits every dish label and letter row into its reserved ticket and lane regions", () => {
+    const ticket = ticketTextSlot();
+    for (const word of SUSHI_WORDS) {
+      const romaji = word.romaji.split("").join(" ");
+      const romajiSize = fittedTextSize(size => Array.from(romaji).length * size * .7, 20, 10, ticket.width);
+      const nameSize = fittedTextSize(size => Array.from(word.name).length * size * .92, 46, 28, ticket.width);
+      expect(Array.from(romaji).length * romajiSize * .7).toBeLessThanOrEqual(ticket.width);
+      expect(Array.from(word.name).length * nameSize * .92).toBeLessThanOrEqual(ticket.width);
+      const tiles = wordTileLayout(word.romaji.length, desktopScene.letters.width, false);
+      expect(tiles.width).toBeLessThanOrEqual(desktopScene.letters.width);
+      expect(tiles.size).toBeGreaterThan(0);
+    }
   });
 
   it("keeps the whole-dish skip control touch-sized in the portrait game", () => {

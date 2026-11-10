@@ -2,38 +2,43 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG, advanceTime, beginPlaying, completedPlates, createSession, currentTemplate, currentWordProgress, gameResult, matchPose, normalizeLandmarks, observe, skipTarget, syntheticLandmarks, upcomingWords, type GameSession } from "./engine";
 import { POSE_TEMPLATES, type Landmark } from "./pose";
 import { ROMAJI_ALPHABET, SUSHI_WORDS, wordSequence } from "./sushi-words";
-import { serializeRelativeEventTime } from "./game-rules";
+import { POSE_TEMPLATE_VERSION, RULES_KEY, serializeRelativeEventTime } from "./game-rules";
 
-function frontFacingAsymmetricFixture(kind: "right-up" | "left-up"): Landmark[] {
+function rawFixture(joints: Record<number, [number, number]>): Landmark[] {
  const landmarks: Landmark[] = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
- const shared: Record<number, [number, number]> = {
-  11: [.59, .34], 12: [.41, .34], 23: [.5576, .52], 24: [.4424, .52],
-  25: [.5576, .736], 26: [.4424, .736], 27: [.5576, .934], 28: [.4424, .934],
- };
- const arms: Record<number, [number, number]> = kind === "right-up"
-  ? { 13: [.617, .493], 15: [.617, .691], 14: [.401, .205], 16: [.401, .061] }
-  : { 13: [.599, .205], 15: [.599, .061], 14: [.383, .493], 16: [.383, .691] };
- for (const [index, [x, y]] of Object.entries({ ...shared, ...arms })) landmarks[Number(index)] = { x, y, visibility: 1 };
+ for (const [index, [x, y]] of Object.entries(joints)) landmarks[Number(index)] = { x, y, visibility: 1 };
  return landmarks;
 }
 
 function horizontallyMirrored(landmarks: Landmark[]): Landmark[] {
  return landmarks.map(landmark => ({ ...landmark, x: 1 - landmark.x }));
 }
+const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
 describe("pose matcher",()=>{
  it("recognizes every exact provisional pose despite a wide source aspect",()=>{for(const pose of POSE_TEMPLATES){const score=matchPose(syntheticLandmarks(pose,16/9),16/9,pose);expect(score.valid).toBe(true);expect(score.accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);}});
  it("uses exactly the canonical ROMAJI letters and rejects an obviously different pose",()=>{expect(POSE_TEMPLATES.map(pose=>pose.id)).toEqual([...ROMAJI_ALPHABET]);const upright=POSE_TEMPLATES.find(x=>x.id==="M")!, handsDown=POSE_TEMPLATES.find(x=>x.id==="I")!;expect(matchPose(syntheticLandmarks(handsDown),16/9,upright).accuracy).toBeLessThan(DEFAULT_CONFIG.threshold);});
+ it("uses the current pose template version in both gameplay and leaderboard isolation",()=>{expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(RULES_KEY).toContain(`|${POSE_TEMPLATE_VERSION}|`);});
+ it("keeps every limb in a plausible standing range and preserves key letter silhouettes",()=>{
+  for(const template of POSE_TEMPLATES) for(const [start,end] of [["leftShoulder","leftElbow"],["leftElbow","leftWrist"],["rightShoulder","rightElbow"],["rightElbow","rightWrist"],["leftHip","leftKnee"],["leftKnee","leftAnkle"],["rightHip","rightKnee"],["rightKnee","rightAnkle"]] as const) { const length=distance(template.pose[start],template.pose[end]);expect(length,`${template.id}:${start}-${end}`).toBeGreaterThan(.5);expect(length,`${template.id}:${start}-${end}`).toBeLessThan(1.5); }
+  const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
+  const A=byId("A").pose,M=byId("M").pose,O=byId("O").pose,U=byId("U").pose;
+  expect(distance(A.leftWrist,A.rightWrist)).toBeLessThan(.3);expect(Math.abs(A.leftAnkle.x-A.rightAnkle.x)).toBeGreaterThan(2);
+  expect(M.leftWrist.y).toBeGreaterThan(M.leftElbow.y);expect(M.rightWrist.y).toBeGreaterThan(M.rightElbow.y);
+  expect(distance(O.leftWrist,O.rightWrist)).toBeLessThan(.3);expect(Math.abs(O.leftElbow.x-O.rightElbow.x)).toBeGreaterThan(2);
+  expect(U.leftWrist.y).toBeLessThan(U.leftElbow.y);expect(U.rightWrist.y).toBeLessThan(U.rightElbow.y);
+ });
  it("keeps every adopted character pose distinct at the play threshold",()=>{for(const actual of POSE_TEMPLATES)for(const target of POSE_TEMPLATES)if(actual.id!==target.id)expect(matchPose(syntheticLandmarks(actual,16/9),16/9,target).accuracy,`${actual.character} must not solve ${target.character}`).toBeLessThan(DEFAULT_CONFIG.threshold);});
  it("maps raw front-facing anatomical sides into canonical mirrored-viewer scoring coordinates",()=>{
-  const rightUp=POSE_TEMPLATES.find(template=>template.id==="U")!,leftUp=POSE_TEMPLATES.find(template=>template.id==="N")!;
-  const rightUpRaw=frontFacingAsymmetricFixture("right-up"),leftUpRaw=frontFacingAsymmetricFixture("left-up");
-  expect(rightUpRaw[16].x).toBeLessThan(.5);expect(rightUpRaw[15].x).toBeGreaterThan(.5);
-  expect(leftUpRaw[15].x).toBeGreaterThan(.5);expect(leftUpRaw[16].x).toBeLessThan(.5);
-  expect(matchPose(rightUpRaw,1,rightUp).accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);
-  expect(matchPose(horizontallyMirrored(rightUpRaw),1,rightUp).accuracy).toBeLessThan(DEFAULT_CONFIG.threshold);
-  expect(matchPose(leftUpRaw,1,leftUp).accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);
-  expect(matchPose(horizontallyMirrored(leftUpRaw),1,leftUp).accuracy).toBeLessThan(DEFAULT_CONFIG.threshold);
+  const rightDiagonal=POSE_TEMPLATES.find(template=>template.id==="K")!,leftDiagonal=POSE_TEMPLATES.find(template=>template.id==="N")!;
+  const rightDiagonalRaw=rawFixture({11:[.55,.45],12:[.45,.45],13:[.578,.54],14:[.382,.395],15:[.578,.642],16:[.318,.33],23:[.532,.55],24:[.468,.55],25:[.532,.67],26:[.418,.652],27:[.532,.78],28:[.378,.76]});
+  const leftDiagonalRaw=rawFixture({11:[.55,.45],12:[.45,.45],13:[.57,.372],14:[.418,.525],15:[.57,.295],16:[.364,.628],23:[.532,.55],24:[.468,.55],25:[.542,.67],26:[.458,.67],27:[.542,.78],28:[.458,.78]});
+  expect(rightDiagonalRaw[16].x).toBeLessThan(.5);expect(rightDiagonalRaw[15].x).toBeGreaterThan(.5);
+  expect(leftDiagonalRaw[15].x).toBeGreaterThan(.5);expect(leftDiagonalRaw[16].x).toBeLessThan(.5);
+  expect(matchPose(rightDiagonalRaw,1,rightDiagonal).accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);
+  expect(matchPose(horizontallyMirrored(rightDiagonalRaw),1,rightDiagonal).accuracy).toBeLessThan(DEFAULT_CONFIG.threshold);
+  expect(matchPose(leftDiagonalRaw,1,leftDiagonal).accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);
+  expect(matchPose(horizontallyMirrored(leftDiagonalRaw),1,leftDiagonal).accuracy).toBeLessThan(DEFAULT_CONFIG.threshold);
  });
  it("keeps canonical poses invariant across input position, scale, and aspect",()=>{const target=POSE_TEMPLATES.find(template=>template.id==="K")!,aspect=16/9;const reframed=syntheticLandmarks(target,aspect).map(point=>({ ...point,x:.57+(point.x-.5)*.7,y:.52+(point.y-.55)*.7 }));const pose=normalizeLandmarks(reframed,aspect).pose!;for(const name of Object.keys(target.pose) as (keyof typeof target.pose)[]){expect(pose[name].x).toBeCloseTo(target.pose[name].x);expect(pose[name].y).toBeCloseTo(target.pose[name].y);}});
  it("fails closed for missing, invisible and non-finite points",()=>{const raw=syntheticLandmarks(POSE_TEMPLATES[0]);raw[15].visibility=.1;expect(matchPose(raw,1.5,POSE_TEMPLATES[0]).valid).toBe(false);raw[15].visibility=1;raw[15].x=NaN;expect(matchPose(raw,1.5,POSE_TEMPLATES[0]).valid).toBe(false);expect(matchPose(undefined,1.5,POSE_TEMPLATES[0]).valid).toBe(false);});
@@ -43,8 +48,8 @@ describe("sushi word catalog",()=>{
  it("contains the canonical dishes, alphabet, and a deterministic balanced deck",()=>{
   expect(SUSHI_WORDS.find(word=>word.id==="maguro")).toEqual({id:"maguro",name:"まぐろ",romaji:"MAGURO"});
   expect(new Set(SUSHI_WORDS.flatMap(word=>[...word.romaji]))).toEqual(new Set(ROMAJI_ALPHABET));
-  const deck=wordSequence(42,16);expect(deck).toEqual(wordSequence(42,16));expect(new Set(deck.slice(0,8)).size).toBe(8);
-  expect(deck[7]).not.toBe(deck[8]);
+  const deck=wordSequence(42,32);expect(deck).toEqual(wordSequence(42,32));expect(new Set(deck).size).toBe(32);
+  const next=wordSequence(42,33);expect(next[31]).not.toBe(next[32]);
  });
 });
 describe("game engine",()=>{

@@ -1,11 +1,5 @@
 /** Canonical sushi dishes used by both the client engine and ranking replay. */
-export type SushiWordId = "maguro" | "tamago" | "ebi" | "ika" | "ikura" | "uni" | "tako" | "saba";
-
-export type SushiWord = { id: SushiWordId; name: string; romaji: string };
-
-export type SushiWordProgress = { word: SushiWord; wordIndex: number; letterIndex: number };
-
-export const SUSHI_WORDS: readonly SushiWord[] = [
+export const SUSHI_WORDS = [
   { id: "maguro", name: "まぐろ", romaji: "MAGURO" },
   { id: "tamago", name: "たまご", romaji: "TAMAGO" },
   { id: "ebi", name: "えび", romaji: "EBI" },
@@ -14,7 +8,36 @@ export const SUSHI_WORDS: readonly SushiWord[] = [
   { id: "uni", name: "うに", romaji: "UNI" },
   { id: "tako", name: "たこ", romaji: "TAKO" },
   { id: "saba", name: "さば", romaji: "SABA" },
+  { id: "sake", name: "さけ", romaji: "SAKE" },
+  { id: "anago", name: "あなご", romaji: "ANAGO" },
+  { id: "tai", name: "たい", romaji: "TAI" },
+  { id: "katsuo", name: "かつお", romaji: "KATSUO" },
+  { id: "buri", name: "ぶり", romaji: "BURI" },
+  { id: "karei", name: "かれい", romaji: "KAREI" },
+  { id: "isaki", name: "いさき", romaji: "ISAKI" },
+  { id: "akagai", name: "あかがい", romaji: "AKAGAI" },
+  { id: "mirugai", name: "みるがい", romaji: "MIRUGAI" },
+  { id: "torigai", name: "とりがい", romaji: "TORIGAI" },
+  { id: "kani", name: "かに", romaji: "KANI" },
+  { id: "kurumaebi", name: "くるまえび", romaji: "KURUMAEBI" },
+  { id: "amaebi", name: "あまえび", romaji: "AMAEBI" },
+  { id: "botanebi", name: "ぼたんえび", romaji: "BOTANEBI" },
+  { id: "namako", name: "なまこ", romaji: "NAMAKO" },
+  { id: "umemaki", name: "梅巻", romaji: "UMEMAKI" },
+  { id: "tekka", name: "鉄火巻", romaji: "TEKKAMAKI" },
+  { id: "natto", name: "納豆巻", romaji: "NATTOMAKI" },
+  { id: "inari", name: "いなり", romaji: "INARI" },
+  { id: "tobiko", name: "とびこ", romaji: "TOBIKO" },
+  { id: "masago", name: "まさご", romaji: "MASAGO" },
+  { id: "aburimaguro", name: "炙りまぐろ", romaji: "ABURIMAGURO" },
+  { id: "ootoro", name: "大とろ", romaji: "OOTORO" },
+  { id: "negitoro", name: "ねぎとろ", romaji: "NEGITORO" },
 ] as const;
+
+export type SushiWordId = (typeof SUSHI_WORDS)[number]["id"];
+export type SushiWord = (typeof SUSHI_WORDS)[number];
+
+export type SushiWordProgress = { word: SushiWord; wordIndex: number; letterIndex: number };
 
 export const ROMAJI_ALPHABET = ["A", "B", "E", "G", "I", "K", "M", "N", "O", "R", "S", "T", "U"] as const;
 export type RomajiLetter = (typeof ROMAJI_ALPHABET)[number];
@@ -49,7 +72,7 @@ export function shuffledWordIds(random: () => number, previous?: SushiWordId): S
   return ids;
 }
 
-/** A deterministic balanced deck with no identical dishes at a batch boundary. */
+/** A deterministic full-dish deck with no repeat until every dish has appeared. */
 export function wordSequence(seed: number, count = 200): SushiWordId[] {
   const output: SushiWordId[] = [];
   for (let batch = 0; output.length < count; batch++) {

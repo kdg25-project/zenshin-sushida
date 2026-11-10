@@ -26,20 +26,22 @@ const base = (overrides: PartialPose): NormalizedPose => ({
 });
 const paths: JointName[][] = [["leftShoulder", "leftElbow", "leftWrist"], ["rightShoulder", "rightElbow", "rightWrist"], ["leftHip", "leftKnee", "leftAnkle"], ["rightHip", "rightKnee", "rightAnkle"]];
 
-// Physically manageable standing poses for the ROMAJI alphabet used by sushi words.
-// IDs are intentionally the actual letters; sushi dishes are data, not pose IDs.
+// Physically manageable standing silhouettes for the ROMAJI alphabet used by sushi
+// words. These are letter suggestions, not sign language: one standing body cannot
+// reproduce every stroke of a font. The arm/leg lines carry the recognisable parts
+// of each capital while both feet remain grounded.
 export const POSE_TEMPLATES: PoseTemplate[] = [
-  ["A", "A", "両腕を斜め上に伸ばし、足を少し広げる", { leftElbow:{x:-1.35,y:-1.45},rightElbow:{x:1.35,y:-1.45},leftWrist:{x:-2.2,y:-1.9},rightWrist:{x:2.2,y:-1.9},leftKnee:{x:-1.05,y:1.1},rightKnee:{x:1.05,y:1.1},leftAnkle:{x:-1.55,y:2.1},rightAnkle:{x:1.55,y:2.1} }],
-  ["B", "B", "両手を胸の前に寄せる", { leftElbow:{x:-.85,y:-.75},rightElbow:{x:.85,y:-.75},leftWrist:{x:-.18,y:-.4},rightWrist:{x:.18,y:-.4} }],
-  ["E", "E", "右腕を横に、左手を腰へ", { rightElbow:{x:1.3,y:-1},rightWrist:{x:2.1,y:-1},leftElbow:{x:-.7,y:-.45},leftWrist:{x:-.5,y:.1} }],
-  ["G", "G", "軽く腰を落として両腕を横に広げる", { leftHip:{x:-.42,y:0},rightHip:{x:.42,y:0},leftKnee:{x:-.9,y:.7},rightKnee:{x:.9,y:.7},leftAnkle:{x:-.75,y:1.65},rightAnkle:{x:.75,y:1.65},leftElbow:{x:-1.3,y:-.8},rightElbow:{x:1.3,y:-.8},leftWrist:{x:-2,y:-.6},rightWrist:{x:2,y:-.6} }],
-  ["I", "I", "両手をまっすぐ下に伸ばす", { leftElbow:{x:-.65,y:-.15},rightElbow:{x:.65,y:-.15},leftWrist:{x:-.65,y:.95},rightWrist:{x:.65,y:.95} }],
-  ["K", "K", "右手を上、左腕を横に伸ばす", { leftElbow:{x:-1.3,y:-1},leftWrist:{x:-2.1,y:-1},rightElbow:{x:.55,y:-1.75},rightWrist:{x:.55,y:-2.55} }],
-  ["M", "M", "両手をまっすぐ上に伸ばす", { leftElbow:{x:-.55,y:-1.75},rightElbow:{x:.55,y:-1.75},leftWrist:{x:-.55,y:-2.55},rightWrist:{x:.55,y:-2.55} }],
-  ["N", "N", "左手を上、右手を下に伸ばす", { leftElbow:{x:-.55,y:-1.75},leftWrist:{x:-.55,y:-2.55},rightElbow:{x:.65,y:-.15},rightWrist:{x:.65,y:.95} }],
-  ["O", "O", "両腕で大きな丸を作る", { leftElbow:{x:-1.15,y:-1.55},rightElbow:{x:1.15,y:-1.55},leftWrist:{x:-1.8,y:-2.75},rightWrist:{x:1.8,y:-2.75} }],
-  ["R", "R", "左手を上、右腕を横に伸ばす", { leftElbow:{x:-.55,y:-1.75},leftWrist:{x:-.55,y:-2.55},rightElbow:{x:1.3,y:-1},rightWrist:{x:2.1,y:-1} }],
-  ["S", "S", "左腕を横に、右手を腰へ", { leftElbow:{x:-1.3,y:-1},leftWrist:{x:-2.1,y:-1},rightElbow:{x:.7,y:-.45},rightWrist:{x:.5,y:.1} }],
-  ["T", "T", "両腕を真横に広げる", { leftElbow:{x:-1.3,y:-1},rightElbow:{x:1.3,y:-1},leftWrist:{x:-2.1,y:-1},rightWrist:{x:2.1,y:-1} }],
-  ["U", "U", "右手を上、左手を下に伸ばす", { rightElbow:{x:.55,y:-1.75},rightWrist:{x:.55,y:-2.55},leftElbow:{x:-.65,y:-.15},leftWrist:{x:-.65,y:.95} }],
+  ["A", "A", "両手を頭上で近づけ、足を広げてAの頂点を作る", { leftElbow:{x:-.86,y:-1.55},rightElbow:{x:.86,y:-1.55},leftWrist:{x:-.12,y:-2.35},rightWrist:{x:.12,y:-2.35},leftKnee:{x:-.92,y:1.08},rightKnee:{x:.92,y:1.08},leftAnkle:{x:-1.35,y:2.08},rightAnkle:{x:1.35,y:2.08} }],
+  ["B", "B", "左腕を体側の縦線にし、右ひじを張って胸の前へ曲げる", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.3,y:-1.18},rightWrist:{x:.28,y:-.24} }],
+  ["E", "E", "左腕を体側の縦線にし、右腕を肩の高さで横へ伸ばす", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.28,y:-1},rightWrist:{x:2.08,y:-1} }],
+  ["G", "G", "左腕を上へ丸く開き、右腕を胸の高さで内側へ折る", { leftElbow:{x:-1.2,y:-1.55},leftWrist:{x:-.18,y:-2.08},rightElbow:{x:1.25,y:-.58},rightWrist:{x:.22,y:-.32},leftKnee:{x:-.55,y:1.16},rightKnee:{x:.55,y:1.16},leftAnkle:{x:-.7,y:2.2},rightAnkle:{x:.7,y:2.2} }],
+  ["I", "I", "両腕を体側へまっすぐ下ろし、足をそろえる", { leftElbow:{x:-.65,y:-.12},rightElbow:{x:.65,y:-.12},leftWrist:{x:-.65,y:.98},rightWrist:{x:.65,y:.98},leftKnee:{x:-.28,y:1.2},rightKnee:{x:.28,y:1.2},leftAnkle:{x:-.28,y:2.3},rightAnkle:{x:.28,y:2.3} }],
+  ["K", "K", "左腕を体側へ下ろし、右腕と右脚を外へ斜めに開く", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.18,y:-1.55},rightWrist:{x:1.82,y:-2.2},rightKnee:{x:.82,y:1.02},rightAnkle:{x:1.22,y:2.1} }],
+  ["M", "M", "両ひじを高く外へ開き、両手を中央へ下げてMの谷を作る", { leftElbow:{x:-1.18,y:-1.88},rightElbow:{x:1.18,y:-1.88},leftWrist:{x:-.18,y:-1.18},rightWrist:{x:.18,y:-1.18},leftKnee:{x:-.84,y:1.12},rightKnee:{x:.84,y:1.12},leftAnkle:{x:-1.2,y:2.15},rightAnkle:{x:1.2,y:2.15} }],
+  ["N", "N", "左腕を上の縦線にし、右腕を右下へ斜めに伸ばす", { leftElbow:{x:-.7,y:-1.78},leftWrist:{x:-.7,y:-2.55},rightElbow:{x:.82,y:-.25},rightWrist:{x:1.36,y:.78},leftKnee:{x:-.42,y:1.2},rightKnee:{x:.42,y:1.2},leftAnkle:{x:-.42,y:2.3},rightAnkle:{x:.42,y:2.3} }],
+  ["O", "O", "両ひじを外へ丸く上げ、両手を頭上で近づけてOを閉じる", { leftElbow:{x:-1.08,y:-1.52},rightElbow:{x:1.08,y:-1.52},leftWrist:{x:-.12,y:-2.18},rightWrist:{x:.12,y:-2.18},leftKnee:{x:-.38,y:1.2},rightKnee:{x:.38,y:1.2},leftAnkle:{x:-.38,y:2.3},rightAnkle:{x:.38,y:2.3} }],
+  ["R", "R", "左腕を体側の縦線にし、右腕で上の輪を作って右脚を外へ出す", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.24,y:-1.18},rightWrist:{x:.26,y:-.78},rightKnee:{x:1.15,y:.95},rightAnkle:{x:1.85,y:1.95} }],
+  ["S", "S", "左腕を上側へ、右腕を下側へ逆向きに曲げてSのうねりを作る", { leftElbow:{x:-1.22,y:-1.32},leftWrist:{x:-.22,y:-1.7},rightElbow:{x:.78,y:-.4},rightWrist:{x:-.45,y:.28},leftKnee:{x:-.52,y:1.18},rightKnee:{x:.52,y:1.18},leftAnkle:{x:-.68,y:2.22},rightAnkle:{x:.68,y:2.22} }],
+  ["T", "T", "両腕を肩の高さで真横に広げ、足をそろえる", { leftElbow:{x:-1.3,y:-1},rightElbow:{x:1.3,y:-1},leftWrist:{x:-2.1,y:-1},rightWrist:{x:2.1,y:-1},leftKnee:{x:-.28,y:1.2},rightKnee:{x:.28,y:1.2},leftAnkle:{x:-.28,y:2.3},rightAnkle:{x:.28,y:2.3} }],
+  ["U", "U", "両ひじを肩の高さで外へ張り、前腕を上へ立てるゴールポスト型", { leftElbow:{x:-1.18,y:-1},rightElbow:{x:1.18,y:-1},leftWrist:{x:-1.18,y:-2.02},rightWrist:{x:1.18,y:-2.02},leftKnee:{x:-.38,y:1.2},rightKnee:{x:.38,y:1.2},leftAnkle:{x:-.38,y:2.3},rightAnkle:{x:.38,y:2.3} }],
 ].map(([id, character, description, pose]) => ({ id: id as string, character: character as string, description: description as string, pose: base(pose as PartialPose), paths }));

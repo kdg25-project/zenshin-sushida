@@ -19,19 +19,19 @@ describe("mirrored skeleton projection", () => {
   });
 
   it("aligns each asymmetric target with physically front-facing raw landmarks after display mirroring", () => {
-    const rightUp = POSE_TEMPLATES.find(template => template.id === "U")!;
-    const leftUp = POSE_TEMPLATES.find(template => template.id === "N")!;
+    const rightDiagonal = POSE_TEMPLATES.find(template => template.id === "K")!;
+    const leftDiagonal = POSE_TEMPLATES.find(template => template.id === "N")!;
     const layout = { centerX: 500, centerY: 520, scale: 180 };
-    const rawRightWrist = projectCameraLandmark({ x: .401, y: .061 }, { width: 1000, height: 1000 });
-    const rawLeftWrist = projectCameraLandmark({ x: .599, y: .061 }, { width: 1000, height: 1000 });
-    const rightUpGuide = projectTargetPosePoint(rightUp.pose.rightWrist, layout);
-    const leftUpGuide = projectTargetPosePoint(leftUp.pose.leftWrist, layout);
+    const rawRightWrist = projectCameraLandmark({ x: .1724, y: .124 }, { width: 1000, height: 1000 });
+    const rawLeftWrist = projectCameraLandmark({ x: .626, y: .061 }, { width: 1000, height: 1000 });
+    const rightDiagonalGuide = projectTargetPosePoint(rightDiagonal.pose.rightWrist, layout);
+    const leftDiagonalGuide = projectTargetPosePoint(leftDiagonal.pose.leftWrist, layout);
 
-    expect(rawRightWrist.screen.x).toBeCloseTo(rightUpGuide.x);
-    expect(rawRightWrist.screen.y).toBeCloseTo(rightUpGuide.y);
-    expect(rawLeftWrist.screen.x).toBeCloseTo(leftUpGuide.x);
-    expect(rawLeftWrist.screen.y).toBeCloseTo(leftUpGuide.y);
-    expect(rightUpGuide.x).toBeGreaterThan(layout.centerX);
-    expect(leftUpGuide.x).toBeLessThan(layout.centerX);
+    expect(rawRightWrist.screen.x).toBeCloseTo(rightDiagonalGuide.x);
+    expect(rawRightWrist.screen.y).toBeCloseTo(rightDiagonalGuide.y);
+    expect(rawLeftWrist.screen.x).toBeCloseTo(leftDiagonalGuide.x);
+    expect(rawLeftWrist.screen.y).toBeCloseTo(leftDiagonalGuide.y);
+    expect(rightDiagonalGuide.x).toBeGreaterThan(layout.centerX);
+    expect(leftDiagonalGuide.x).toBeLessThan(layout.centerX);
   });
 });

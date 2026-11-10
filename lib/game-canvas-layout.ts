@@ -1,23 +1,53 @@
 export type Rect = { x: number; y: number; width: number; height: number };
 export const GAME_WIDTH = 1200;
-export const GAME_HEIGHT = 800;
+/** Desktop follows the supplied 1920×1080 arcade reference without anisotropic scaling. */
+export const GAME_HEIGHT = 675;
+/** The rendered host width is the only source of truth for the game orientation. */
+export const GAME_LAYOUT_BREAKPOINT = 768;
+export type GameLayoutMode = "portrait" | "landscape";
+export const gameLayoutModeForWidth = (width: number): GameLayoutMode => width < GAME_LAYOUT_BREAKPOINT ? "portrait" : "landscape";
+
+/** Shared desktop presentation bands based on the supplied 1920×1080 reference. */
+export const desktopScene = {
+  header: { x: 0, y: 0, width: GAME_WIDTH, height: 112 },
+  conveyor: { x: 0, y: 112, width: GAME_WIDTH, height: 153 },
+  navyBoard: { x: 0, y: 265, width: GAME_WIDTH, height: 173 },
+  counter: { x: 0, y: 438, width: GAME_WIDTH, height: GAME_HEIGHT - 438 },
+  ticket: { x: 340, y: 105, width: 520, height: 145 },
+  letters: { x: 120, y: 286, width: 960, height: 126 },
+  waveLeft: { x: 0, y: 344, width: 156, height: 94 },
+  waveRight: { x: 1044, y: 344, width: 156, height: 94 },
+  hudScore: { x: 105, y: 18, width: 250, height: 84 },
+  hudTimer: { x: 385, y: 18, width: 420, height: 84 },
+  hudCombo: { x: 825, y: 18, width: 110, height: 84 },
+  hudPlates: { x: 955, y: 18, width: 140, height: 84 },
+  hudLeftLantern: { x: 0, y: 0, width: 94, height: 116 },
+  hudRightLantern: { x: 1106, y: 0, width: 94, height: 116 },
+  playGuide: { x: 190, y: 458, width: 330, height: 160 },
+  playCamera: { x: 550, y: 458, width: 480, height: 160 },
+  playFeedback: { x: 550, y: 624, width: 480, height: 34 },
+  calibrationCamera: { x: 85, y: 125, width: 500, height: 270 },
+  calibrationGuide: { x: 615, y: 125, width: 500, height: 270 },
+  calibrationMessage: { x: 180, y: 414, width: 840, height: 46 },
+} as const satisfies Record<string, Rect>;
 
 export const gameRects = {
-  name: { x: 405, y: 330, width: 390, height: 54 },
-  menuCamera: { x: 390, y: 432, width: 420, height: 58 },
-  menuPractice: { x: 390, y: 504, width: 420, height: 52 },
-  menuRanking: { x: 390, y: 570, width: 420, height: 46 },
-  calibrationStart: { x: 130, y: 675, width: 330, height: 52 },
-  calibrationBack: { x: 480, y: 675, width: 220, height: 52 },
-  gameSkip: { x: 205, y: 735, width: 320, height: 44 },
-  resultRegister: { x: 390, y: 584, width: 420, height: 52 },
-  resultRetry: { x: 390, y: 650, width: 202, height: 48 },
-  resultMenu: { x: 608, y: 650, width: 202, height: 48 },
-  rankingBack: { x: 70, y: 682, width: 210, height: 46 },
-  rankingRefresh: { x: 900, y: 682, width: 220, height: 46 },
-  rankingRetry: { x: 440, y: 520, width: 320, height: 48 },
-  camera: { x: 70, y: 300, width: 500, height: 281 },
-  target: { x: 658, y: 292, width: 450, height: 285 },
+  name: { x: 405, y: 220, width: 390, height: 44 },
+  menuCamera: { x: 390, y: 304, width: 420, height: 48 },
+  menuPractice: { x: 390, y: 362, width: 420, height: 44 },
+  menuRanking: { x: 390, y: 416, width: 420, height: 42 },
+  menuPoseList: { x: 960, y: 24, width: 190, height: 78 },
+  calibrationStart: { x: 330, y: 490, width: 330, height: 48 },
+  calibrationBack: { x: 680, y: 490, width: 220, height: 48 },
+  gameSkip: { x: 190, y: 624, width: 330, height: 34 },
+  resultRegister: { x: 390, y: 505, width: 420, height: 42 },
+  resultRetry: { x: 390, y: 558, width: 202, height: 40 },
+  resultMenu: { x: 608, y: 558, width: 202, height: 40 },
+  rankingBack: { x: 70, y: 610, width: 210, height: 40 },
+  rankingRefresh: { x: 900, y: 610, width: 220, height: 40 },
+  rankingRetry: { x: 440, y: 510, width: 320, height: 40 },
+  camera: desktopScene.calibrationCamera,
+  target: desktopScene.calibrationGuide,
   world: { x: 205, y: 88, width: 790, height: 226 },
 } as const satisfies Record<string, Rect>;
 
@@ -28,6 +58,7 @@ export const compactGameRects = {
   menuCamera: { x: 210, y: 382, width: 780, height: 145 },
   menuPractice: { x: 210, y: 548, width: 780, height: 145 },
   menuRanking: { x: 210, y: 710, width: 780, height: 70 },
+  menuPoseList: { x: 900, y: 25, width: 230, height: 110 },
   camera: { x: 60, y: 220, width: 1080, height: 270 },
   calibrationStart: { x: 95, y: 555, width: 650, height: 145 },
   calibrationBack: { x: 770, y: 555, width: 335, height: 145 },
@@ -48,11 +79,12 @@ export const portraitGameRects = {
   menuCamera: { x: 60, y: 370, width: 480, height: 92 },
   menuPractice: { x: 60, y: 486, width: 480, height: 92 },
   menuRanking: { x: 60, y: 602, width: 480, height: 82 },
+  menuPoseList: { x: 330, y: 16, width: 230, height: 72 },
   camera: { x: 30, y: 190, width: 540, height: 290 },
   target: { x: 30, y: 505, width: 540, height: 300 },
   calibrationStart: { x: 48, y: 570, width: 315, height: 86 },
   calibrationBack: { x: 385, y: 570, width: 167, height: 86 },
-  gameSkip: { x: 105, y: 880, width: 390, height: 86 },
+  gameSkip: { x: 30, y: 742, width: 540, height: 70 },
   resultRegister: { x: 55, y: 680, width: 490, height: 80 },
   resultRetry: { x: 55, y: 790, width: 230, height: 80 },
   resultMenu: { x: 315, y: 790, width: 230, height: 80 },
@@ -61,7 +93,7 @@ export const portraitGameRects = {
   rankingRetry: { x: 55, y: 700, width: 490, height: 80 },
 } as const satisfies Record<keyof typeof gameRects, Rect>;
 
-export function fitGameViewport(width: number, height: number, compact = width < 550) {
+export function fitGameViewport(width: number, height: number, compact = gameLayoutModeForWidth(width) === "portrait") {
   const logicalWidth = compact ? PORTRAIT_WIDTH : GAME_WIDTH, logicalHeight = compact ? PORTRAIT_HEIGHT : GAME_HEIGHT;
   const scale = Math.min(width / logicalWidth, height / logicalHeight);
   return { scale, x: (width - logicalWidth * scale) / 2, y: (height - logicalHeight * scale) / 2, width: logicalWidth * scale, height: logicalHeight * scale, compact, logicalWidth, logicalHeight };
@@ -86,6 +118,33 @@ export function truncateCanvasText(value: string, maxCharacters: number) {
 
 export function cssRect(rect: Rect, viewport: ReturnType<typeof fitGameViewport>) {
   return { left: viewport.x + rect.x * viewport.scale, top: viewport.y + rect.y * viewport.scale, width: rect.width * viewport.scale, height: rect.height * viewport.scale };
+}
+
+/** Tile geometry is shared by the painter and layout tests so long ROMAJI words never spill out. */
+export function wordTileLayout(letterCount: number, maxWidth: number, portrait: boolean) {
+  const count = Math.max(1, letterCount);
+  const gap = portrait ? 8 : 13;
+  const cap = portrait ? 52 : 136;
+  const size = Math.min(cap, (maxWidth - gap * (count - 1)) / count);
+  const width = size * count + gap * (count - 1);
+  return { gap, size, width, start: -width / 2 };
+}
+
+/** Finds the largest readable canvas font size whose measured text fits its assigned region. */
+export function fittedTextSize(measure: (size: number) => number, preferredSize: number, minimumSize: number, maxWidth: number) {
+  let size = preferredSize;
+  while (size > minimumSize && measure(size) > maxWidth) size -= 1;
+  return size;
+}
+
+/** The ticket's right-hand type region; sushi art is always kept out of this rectangle. */
+export function ticketTextSlot(ticket: Rect = desktopScene.ticket) {
+  const left = ticket.x + ticket.width * .43;
+  return { x: left, y: ticket.y + 18, width: ticket.x + ticket.width - 22 - left, height: ticket.height - 36 };
+}
+
+export function rectsOverlap(a: Rect, b: Rect) {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
 /** The sole logical-to-backing-store transform used by the 2D canvas renderer. */

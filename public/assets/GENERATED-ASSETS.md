@@ -5,6 +5,7 @@ Generated with the built-in `image_gen` tool for this project. Both images retai
 ## Saved assets
 
 - `public/assets/sushi-atlas-v2.png`: 1774 x 887, four columns by two rows. MAGURO, TAMAGO, EBI, IKA / IKURA, UNI, TAKO, SABA.
+- `public/assets/sushi-atlas-extra-v1.png`: 1536 x 1024, six columns by four rows. The 24 dishes in `SUSHI_WORDS.slice(8)` order: SAKE, ANAGO, TAI, KATSUO, BURI, KAREI / ISAKI, AKAGAI, MIRUGAI, TORIGAI, KANI, KURUMAEBI / AMAEBI, BOTANEBI, NAMAKO, UMEMAKI, TEKKAMAKI, NATTOMAKI / INARI, TOBIKO, MASAGO, ABURIMAGURO, OOTORO, NEGITORO. Generated with `image_gen` as a transparent, original 2D hand-painted companion atlas using the same red-rimmed plate treatment as the original eight dishes.
 - `public/assets/title-wordmark-v2.png`: 2172 x 724, original Japanese brush title.
 
 ## Sushi atlas prompt

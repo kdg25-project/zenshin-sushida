@@ -2,14 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { GameSession } from "../lib/engine";
-import { GAME_HEIGHT, GAME_WIDTH, PORTRAIT_HEIGHT, PORTRAIT_WIDTH, canvasBackingTransform, containVideo, cssRect, displayBonePoint, fitGameViewport, fitTargetPose, gameRects, portraitGameRects, truncateCanvasText, wrapCanvasText, type Rect } from "../lib/game-canvas-layout";
+import { GAME_HEIGHT, GAME_WIDTH, PORTRAIT_HEIGHT, PORTRAIT_WIDTH, canvasBackingTransform, containVideo, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, portraitGameRects, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText, type Rect } from "../lib/game-canvas-layout";
 import { formatStoredRankingAccuracy } from "../lib/game-ui";
 import { applyPresentationLifecycle } from "../lib/presentation-lifecycle";
 import { resolveCameraCta } from "../lib/camera-cta";
+import { targetHeadRadius, TARGET_LINKS } from "../lib/pose-guide";
 import type { Landmark, PoseTemplate } from "../lib/pose";
 import type { SushiWord, SushiWordProgress } from "../lib/sushi-words";
 import { SushiSceneFrameGate } from "../lib/sushi-scene-lifecycle";
-import { drawMenuSushiPlates, drawSushiPlate, drawWoodBoard, drawWordmark, loadSushiArt, sushiLabel, type SushiArtAssets, type SushiArtId } from "../lib/sushi-art-2d";
+import { drawSushiPlate, drawWordmark, loadSushiArt, type SushiArtAssets } from "../lib/sushi-art-2d";
+import { drawable, loadSfUiAssets, type SfUiAssets } from "../lib/sf-ui-assets";
 
 type RankEntry = { playerName: string; score: number; solved: number; maxCombo: number; averageAccuracy: number; createdAt: number };
 type View = "menu" | "game" | "ranking";
@@ -20,15 +22,12 @@ type Props = {
   simulation: boolean; rankingEligible: boolean; cameraCalibrated: boolean; cameraStarting: boolean; cameraMessage: string; landmarks?: Landmark[];
   ranking: RankEntry[]; rankingStatus: "loading" | "ready" | "error"; rankMessage: string; rankError?: string; submitting: boolean;
   videoRef: RefObject<HTMLVideoElement | null>; poseCanvasRef: RefObject<HTMLCanvasElement | null>;
-  onNameChange(name: string): void; onOpenCamera(): void; onPractice(): void; onRankings(): void; onBackMenu(): void;
+  onNameChange(name: string): void; onOpenCamera(): void; onPractice(): void; onRankings(): void; onOpenPoseList(): void; onBackMenu(): void;
   onStartCamera(): void; onStart(): void; onSkip(): void; onRegister(): void; onRetry(): void; onFetchRanks(): void;
 };
 type CanvasDriver = { dispose(): void; resize(): void; wake(): void; update(): void; setHidden(hidden: boolean): void; setReducedMotion(reduced: boolean): void };
 
 const BONES: [number, number][] = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
-const targetLinks: [keyof PoseTemplate["pose"], keyof PoseTemplate["pose"]][] = [["leftShoulder","rightShoulder"],["leftShoulder","leftElbow"],["leftElbow","leftWrist"],["rightShoulder","rightElbow"],["rightElbow","rightWrist"],["leftShoulder","leftHip"],["rightShoulder","rightHip"],["leftHip","rightHip"],["leftHip","leftKnee"],["leftKnee","leftAnkle"],["rightHip","rightKnee"],["rightKnee","rightAnkle"]];
-const isArtId = (value: string): value is SushiArtId => ["maguro","tamago","ebi","ika","ikura","uni","tako","saba"].includes(value);
-
 function phaseFor(props: Props): Phase {
   if (props.view === "menu") return "menu";
   if (props.view === "ranking") return "ranking";
@@ -42,25 +41,69 @@ function text(ctx: CanvasRenderingContext2D, value: string, x: number, y: number
 function wrapped(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, size: number, color: string, max: number, align: CanvasTextAlign = "center") {
   wrapCanvasText(value, max).forEach((line, i) => text(ctx, line, x, y + i * (size + 7), size, color, align));
 }
-function paper(ctx: CanvasRenderingContext2D, rect: Rect, fill = "#fff8e8") {
-  ctx.fillStyle = "rgba(73,38,19,.22)"; ctx.fillRect(rect.x + 5, rect.y + 7, rect.width, rect.height);
-  ctx.fillStyle = fill; ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-  ctx.strokeStyle = "#67411f"; ctx.lineWidth = 4; ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+const pixelFont = `"SushiLine", "Arial Black", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif`;
+const digitFont = `"SushiDigits", ui-monospace, monospace`;
+function pixelFrame(ctx: CanvasRenderingContext2D, rect: Rect, fill = "#fde0b4", border = "#100d0a", inset = 7) {
+  ctx.save();
+  ctx.fillStyle = "#150e0b";
+  ctx.fillRect(rect.x + inset, rect.y, rect.width - inset * 2, rect.height);
+  ctx.fillRect(rect.x, rect.y + inset, rect.width, rect.height - inset * 2);
+  ctx.fillStyle = fill;
+  ctx.fillRect(rect.x + inset, rect.y + inset, rect.width - inset * 2, rect.height - inset * 2);
+  ctx.strokeStyle = border; ctx.lineWidth = 3;
+  ctx.strokeRect(rect.x + inset + 1.5, rect.y + inset + 1.5, rect.width - inset * 2 - 3, rect.height - inset * 2 - 3);
+  ctx.restore();
 }
+function paper(ctx: CanvasRenderingContext2D, rect: Rect, fill = "#fde0b4") { pixelFrame(ctx, rect, fill, "#33180e", 6); }
 function woodButton(ctx: CanvasRenderingContext2D, rect: Rect, value: string, hot = false, disabled = false) {
-  ctx.fillStyle = disabled ? "#9f8e72" : hot ? "#b63e2c" : "#efe1b7"; ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-  ctx.strokeStyle = "#5b3318"; ctx.lineWidth = 5; ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-  ctx.fillStyle = disabled ? "#eee4cc" : hot ? "#fff8e6" : "#352215";
-  ctx.font = `900 ${rect.height >= 70 ? 25 : 19}px "Yu Mincho", serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(value, rect.x + rect.width / 2, rect.y + rect.height / 2 + 1);
+  pixelFrame(ctx, rect, disabled ? "#9f8e72" : hot ? "#b42a20" : "#fde0b4", "#1a0f0b", 6);
+  text(ctx, value, rect.x + rect.width / 2, rect.y + rect.height / 2 + 1, rect.height >= 70 ? 25 : 19, disabled ? "#eee4cc" : hot ? "#fff8e6" : "#172a3a", "center", pixelFont);
 }
-function drawVideoAndBones(ctx: CanvasRenderingContext2D, props: Props, rect: Rect) {
-  ctx.fillStyle = "#263a32"; ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+function drawImage(ctx: CanvasRenderingContext2D, image: HTMLImageElement | undefined, rect: Rect) {
+  if (drawable(image)) ctx.drawImage(image!, rect.x, rect.y, rect.width, rect.height);
+}
+function drawWoodTexture(ctx: CanvasRenderingContext2D, assets: SfUiAssets | undefined, width: number, height: number, portrait: boolean) {
+  if (!portrait && drawable(assets?.topWood) && drawable(assets?.counterWood)) {
+    drawImage(ctx, assets?.topWood, desktopScene.header);
+    drawImage(ctx, assets?.counterWood, desktopScene.counter);
+    return;
+  }
+  const upper = ctx.createLinearGradient(0, 0, 0, height * .67);
+  upper.addColorStop(0, "#241006"); upper.addColorStop(.56, "#532207"); upper.addColorStop(1, "#351505");
+  ctx.fillStyle = upper; ctx.fillRect(0, 0, width, height * .67);
+  for (let y = 0; y < height * .67; y += 23) {
+    ctx.fillStyle = y % 46 ? "rgba(255,156,69,.055)" : "rgba(0,0,0,.12)";
+    ctx.fillRect(0, y, width, 3);
+  }
+  ctx.fillStyle = "#903602"; ctx.fillRect(0, height * .665, width, height * .335);
+  for (let x = 0; x < width; x += 73) { ctx.fillStyle = "#481b08"; ctx.fillRect(x, height * .665, 6, height * .335); ctx.fillStyle = "rgba(255,154,49,.2)"; ctx.fillRect(x + 12, height * .67, 3, height * .32); }
+  ctx.fillStyle = "#0a0908"; ctx.fillRect(0, height * .665, width, 8); ctx.fillRect(0, height * .988, width, 12);
+  ctx.fillStyle = "#d66b1c"; ctx.fillRect(0, height * .674, width, 7); ctx.fillRect(0, height * .975, width, 6);
+}
+function drawLantern(ctx: CanvasRenderingContext2D, x: number, y: number, flip = false) {
+  ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);
+  ctx.fillStyle="#19100b";ctx.fillRect(-31,-65,62,126);ctx.fillRect(-43,-45,86,86);
+  ctx.fillStyle="#f9d870";ctx.fillRect(-34,-38,68,72);ctx.fillStyle="#d9311d";
+  for(let yy=-28;yy<30;yy+=19)ctx.fillRect(-34,yy,68,7);
+  text(ctx,"寿",0,0,43,"#c7271b","center","Yu Mincho, serif");ctx.fillStyle="#74645a";ctx.fillRect(-18,-78,36,13);ctx.fillRect(-18,50,36,13);ctx.restore();
+}
+function drawCornerWave(ctx: CanvasRenderingContext2D, x: number, y: number, flip = false) {
+  ctx.save();ctx.translate(x,y);if(flip)ctx.scale(-1,1);ctx.strokeStyle="#fffaf0";ctx.lineWidth=5;
+  for(let row=0;row<3;row++)for(let col=0;col<4;col++){const px=col*30+(row%2)*15,py=row*27;ctx.beginPath();ctx.arc(px,py+20,17,Math.PI,0);ctx.arc(px,py+20,8,Math.PI,0);ctx.stroke();}ctx.restore();
+}
+function drawVideoAndBones(ctx: CanvasRenderingContext2D, props: Props, rect: Rect, referencePanel = false) {
+  if (!referencePanel) pixelFrame(ctx, rect, "#bcbcbc", "#100d0a", 7);
+  // Reserve the top of both panels for the caption, then use one framing treatment only.
+  const inner = { x:rect.x + 12, y:rect.y + 34, width:rect.width - 24, height:rect.height - 46 };
+  if (!referencePanel) { ctx.fillStyle = "#afb0b1"; ctx.fillRect(inner.x, inner.y, inner.width, inner.height); }
   const video = props.videoRef.current;
-  const videoRect = containVideo(rect, video?.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 16 / 9);
+  const videoRect = containVideo(inner, video?.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 16 / 9);
   if (video && video.readyState > 1) {
     ctx.save(); ctx.beginPath(); ctx.rect(videoRect.x, videoRect.y, videoRect.width, videoRect.height); ctx.clip();
     ctx.translate(videoRect.x + videoRect.width, videoRect.y); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0, videoRect.width, videoRect.height); ctx.restore();
-  } else text(ctx, props.simulation ? "自動デモ" : "カメラを開始してください", rect.x + rect.width / 2, rect.y + rect.height / 2, 17, "#fff7dc", "center");
+  } else if (props.simulation && props.landmarks?.length) {
+    text(ctx, "自動デモ", videoRect.x + videoRect.width - 8, videoRect.y + 12, 11, "#fff7dc", "right", pixelFont);
+  } else text(ctx, props.simulation ? "自動デモ" : "カメラを開始してください", rect.x + rect.width / 2, rect.y + rect.height / 2 + 10, 17, "#fff7dc", "center", pixelFont);
   if (props.landmarks) {
     ctx.save(); ctx.strokeStyle = "#fff0a6"; ctx.lineWidth = 6; ctx.lineCap = "round";
     for (const [fromIndex, toIndex] of BONES) {
@@ -70,114 +113,150 @@ function drawVideoAndBones(ctx: CanvasRenderingContext2D, props: Props, rect: Re
     }
     ctx.restore();
   }
-  ctx.strokeStyle = "#56351c"; ctx.lineWidth = 5; ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  if (!referencePanel) {
+    ctx.strokeStyle = "#fffdf4"; ctx.lineWidth = 4;
+    for (const [x,y,dx,dy] of [[inner.x+12,inner.y+12,22,0],[inner.x+12,inner.y+12,0,22],[inner.x+inner.width-12,inner.y+12,-22,0],[inner.x+inner.width-12,inner.y+12,0,22],[inner.x+12,inner.y+inner.height-12,22,0],[inner.x+12,inner.y+inner.height-12,0,-22],[inner.x+inner.width-12,inner.y+inner.height-12,-22,0],[inner.x+inner.width-12,inner.y+inner.height-12,0,-22]] as const) { ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+dx,y+dy);ctx.stroke(); }
+  }
 }
 function drawTarget(ctx: CanvasRenderingContext2D, target: PoseTemplate, rect: Rect) {
-  const fitted = fitTargetPose(target.pose, rect, { left:22, top:21, right:22, bottom:18 });
+  const fitted = fitTargetPose(target.pose, rect, { left:12, top:12, right:12, bottom:12 });
   const point = (name: keyof PoseTemplate["pose"]) => fitted.point(target.pose[name]);
   ctx.strokeStyle = "#342817"; ctx.lineWidth = 7; ctx.lineCap = "round";
-  for (const [from, to] of targetLinks) { const start = point(from), end = point(to); ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke(); }
-  const head = fitted.point(fitted.head); ctx.fillStyle = "#fff8e8"; ctx.beginPath(); ctx.arc(head.x, head.y, Math.max(10, Math.min(18, fitted.inner.width / 17)), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  for (const [from, to] of TARGET_LINKS) { const start = point(from), end = point(to); ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke(); }
+  const head = fitted.point(fitted.head), leftShoulder=point("leftShoulder"), rightShoulder=point("rightShoulder");
+  const headRadius=targetHeadRadius(leftShoulder,rightShoulder);
+  ctx.fillStyle = "#fff8e8"; ctx.beginPath(); ctx.arc(head.x, head.y, headRadius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 }
 function wordTrack(ctx: CanvasRenderingContext2D, progress: SushiWordProgress, x: number, y: number, maxWidth: number, portrait: boolean) {
   const letters = Array.from(progress.word.romaji.toUpperCase());
-  const gap = portrait ? 8 : 11, box = Math.min(portrait ? 52 : 61, (maxWidth - gap * (letters.length - 1)) / letters.length);
-  const start = x - (box * letters.length + gap * (letters.length - 1)) / 2;
+  const { gap, size: box, start } = wordTileLayout(letters.length, maxWidth, portrait);
   letters.forEach((letter, index) => {
-    const current = index === progress.letterIndex, done = index < progress.letterIndex, px = start + index * (box + gap);
-    ctx.fillStyle = done ? "#372719" : current ? "#c8422d" : "#e7d9b9"; ctx.fillRect(px, y - box / 2, box, box);
-    ctx.strokeStyle = current ? "#fff3c8" : "#67411f"; ctx.lineWidth = current ? 4 : 2; ctx.strokeRect(px, y - box / 2, box, box);
-    text(ctx, letter, px + box / 2, y + 2, Math.round(box * .56), done || current ? "#fff8e7" : "#75664e", "center", "ui-monospace, monospace");
+    const current = index === progress.letterIndex, done = index < progress.letterIndex, px = x + start + index * (box + gap);
+    pixelFrame(ctx, { x:px, y:y - box / 2, width:box, height:box }, done ? "#d1efcd" : current ? "#ffc6c6" : "#fde0b4", current ? "#ef211d" : done ? "#167015" : "#0e1011", portrait ? 5 : 8);
+    text(ctx, letter, px + box / 2, y + 4, Math.round(box * .58), done ? "#147613" : current ? "#f3201e" : "#172a3a", "center", pixelFont);
   });
 }
-function drawLane(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, props: Props, width: number, portrait: boolean, time: number, animate: boolean) {
-  const hero = props.wordProgress.word, isHero = isArtId(hero.id) ? hero.id : "maguro";
-  const laneY = portrait ? 210 : 235, heroY = portrait ? 245 : 245;
-  ctx.fillStyle = "rgba(255,250,225,.7)"; ctx.fillRect(35, portrait ? 132 : 114, width - 70, portrait ? 252 : 255);
-  ctx.strokeStyle = "#5e391e"; ctx.lineWidth = 4; ctx.strokeRect(35, portrait ? 132 : 114, width - 70, portrait ? 252 : 255);
-  text(ctx, `${hero.name}　${hero.romaji.toUpperCase()}`, width / 2, portrait ? 157 : 139, portrait ? 21 : 24, "#5b321b", "center", "\"Yu Mincho\", serif");
+function fittedText(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, preferredSize: number, minimumSize: number, maxWidth: number, color: string, family: string) {
+  const size = fittedTextSize(size => { ctx.font = `800 ${size}px ${family}`; return ctx.measureText(value).width; }, preferredSize, minimumSize, maxWidth);
+  text(ctx, value, x, y, size, color, "center", family);
+}
+function drawLane(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, reference: SfUiAssets | undefined, props: Props, width: number, portrait: boolean, time: number, animate: boolean) {
+  const hero = props.wordProgress.word;
+  const laneY = portrait ? 210 : 250;
+  const laneTop = portrait ? 132 : desktopScene.conveyor.y, laneHeight = portrait ? 272 : desktopScene.conveyor.height;
+  if (!portrait && drawable(reference?.conveyor)) {
+    for (let x = 0; x < width; x += 55) ctx.drawImage(reference!.conveyor!, x, laneTop, 55, laneHeight);
+  } else {
+    ctx.fillStyle = "#142131"; ctx.fillRect(0, laneTop, width, laneHeight);
+    ctx.strokeStyle="#070a0e";ctx.lineWidth=5;ctx.strokeRect(0,laneTop,width,laneHeight);
+    for(let x=-20;x<width+100;x+=102){ctx.fillStyle="#1c2a3d";ctx.fillRect(x,laneTop+13,92,laneHeight-26);ctx.strokeStyle="#546074";ctx.lineWidth=2;ctx.strokeRect(x,laneTop+13,92,laneHeight-26);}
+  }
+  if (!portrait) { ctx.fillStyle="#172a3a";ctx.fillRect(0,desktopScene.navyBoard.y,width,desktopScene.navyBoard.height); }
+  const ticket = portrait ? {x:68,y:154,width:464,height:134}:desktopScene.ticket;
+  pixelFrame(ctx,ticket,"#fde0b4","#eb1f16",10);ctx.fillStyle="#c70d08";ctx.fillRect(ticket.x+15,ticket.y+15,ticket.width*.36,ticket.height-30);
   const bob = animate ? Math.sin(time / 390) * 2 : 0;
-  drawSushiPlate(ctx, assets, isHero, width / 2, heroY + bob, portrait ? 256 : 286, true);
-  wordTrack(ctx, props.wordProgress, width / 2, portrait ? 365 : 370, portrait ? 488 : 530, portrait);
-  text(ctx, `いまの一文字　${props.target.character}`, width / 2, portrait ? 406 : 412, portrait ? 18 : 19, "#a53025", "center");
+  if (!portrait && hero.id === "maguro" && drawable(reference?.maguro)) drawImage(ctx, reference?.maguro, { x:ticket.x + 15, y:ticket.y + 16 + bob, width:ticket.width*.36, height:ticket.height - 32 });
+  else drawSushiPlate(ctx, assets, hero.id, ticket.x + ticket.width*.19, ticket.y + ticket.height*.57 + bob, portrait ? 150 : 194, true);
+  const ticketText = ticketTextSlot(ticket);
+  const ticketCenter = ticketText.x + ticketText.width / 2;
+  fittedText(ctx, hero.name, ticketCenter, ticket.y + ticket.height * .47, portrait ? 34 : 46, portrait ? 22 : 28, ticketText.width, "#08090b", pixelFont);
+  fittedText(ctx, hero.romaji.toUpperCase().split("").join(" "), ticketCenter, ticket.y + ticket.height * .77, portrait ? 14 : 20, 10, ticketText.width, "#8b6244", pixelFont);
+  if (!portrait && drawable(reference?.wave)) { drawImage(ctx, reference?.wave, desktopScene.waveLeft);ctx.save();ctx.translate(width,0);ctx.scale(-1,1);drawImage(ctx,reference?.wave,{...desktopScene.waveRight,x:0});ctx.restore(); }
+  else { drawCornerWave(ctx, portrait ? 20 : 40, portrait ? 420 : 352); drawCornerWave(ctx, portrait ? width-20 : width-40, portrait ? 420 : 352, true); }
+  wordTrack(ctx, props.wordProgress, width / 2, portrait ? 365 : desktopScene.letters.y + desktopScene.letters.height / 2, portrait ? 488 : desktopScene.letters.width, portrait);
   const upcoming = props.upcomingWords.slice(0, portrait ? 2 : 3);
   upcoming.forEach((word, index) => {
-    if (!isArtId(word.id)) return;
-    const x = width * .73 + index * (portrait ? 60 : 82), y = laneY + (index % 2 ? 7 : -3);
-    drawSushiPlate(ctx, assets, word.id, x, y, portrait ? 65 : 80);
-    text(ctx, word.name, x, y + (portrait ? 38 : 45), portrait ? 12 : 13, "#5a3621", "center");
+    const x = portrait ? 76 + index * 445 : [110, 1080, 1225][index]!, y = portrait ? laneY + (index % 2 ? 7 : -3) : 190 + (index % 2 ? 10 : 0);
+    drawSushiPlate(ctx, assets, word.id, x, y, portrait ? 65 : 88);
+    if (portrait) text(ctx, word.name, x, y + 38, 12, "#fff8e7", "center");
   });
-  text(ctx, `完成 ${props.completedPlates} 皿`, portrait ? 82 : 115, portrait ? 160 : 142, portrait ? 15 : 17, "#56351c", "center");
-  ctx.fillStyle = "#d2a262"; ctx.fillRect(0, portrait ? 425 : 432, width, portrait ? 16 : 18);
-  ctx.fillStyle = "#704020"; for (let x = 0; x < width; x += 68) ctx.fillRect(x, portrait ? 437 : 450, 42, 6);
+  ctx.fillStyle = "#dc6519"; ctx.fillRect(0, laneTop + laneHeight - 4, width, 9);
 }
-function drawHud(ctx: CanvasRenderingContext2D, props: Props, width: number, portrait: boolean) {
-  const y = portrait ? 74 : 70;
-  text(ctx, "SCORE", portrait ? 28 : 55, y - 16, portrait ? 13 : 14, "#72502f");
-  text(ctx, props.session.score.toLocaleString(), portrait ? 28 : 55, y + 11, portrait ? 28 : 34, "#a52e24", "left", "ui-monospace, monospace");
-  text(ctx, `${props.session.combo} 連`, portrait ? 180 : 245, y + 8, portrait ? 22 : 25, "#392915", "left");
-  text(ctx, `のこり ${String(props.remaining).padStart(2, "0")} 秒`, width - (portrait ? 26 : 50), y, portrait ? 24 : 30, props.remaining <= 10 ? "#b33127" : "#392915", "right", "ui-monospace, monospace");
+function drawHud(ctx: CanvasRenderingContext2D, reference: SfUiAssets | undefined, props: Props, width: number, portrait: boolean) {
+  if (portrait) {
+    pixelFrame(ctx,{x:18,y:14,width:142,height:76},"#fde0b4");pixelFrame(ctx,{x:170,y:14,width:250,height:76},"#a92820");pixelFrame(ctx,{x:430,y:14,width:70,height:76},"#fde0b4");pixelFrame(ctx,{x:508,y:14,width:76,height:76},"#fde0b4");
+    text(ctx,"スコア",34,35,12,"#0a0b0d","left",pixelFont);text(ctx,props.session.score.toLocaleString(),34,65,25,"#07080a","left",digitFont);
+    text(ctx,"残り",187,34,13,"#fff8e7","left",pixelFont);text(ctx,`${props.remaining}`,330,65,40,"#fff","center",digitFont);
+    text(ctx,"連続",465,34,12,"#0a0b0d","center",pixelFont);text(ctx,String(props.session.combo),465,65,28,"#a92820","center",digitFont);
+    text(ctx,"お皿",546,34,12,"#0a0b0d","center",pixelFont);text(ctx,String(props.completedPlates),546,65,28,"#172a3a","center",digitFont);return;
+  }
+  const { hudScore: score, hudTimer: timer, hudCombo: combo, hudPlates: plates, hudLeftLantern: leftLantern, hudRightLantern: rightLantern } = desktopScene;
+  if (drawable(reference?.lanternLeft) && drawable(reference?.lanternRight)) { drawImage(ctx,reference?.lanternLeft,leftLantern);drawImage(ctx,reference?.lanternRight,rightLantern); } else { drawLantern(ctx,leftLantern.width / 2,58);drawLantern(ctx,width-rightLantern.width / 2,58,true); }
+  pixelFrame(ctx,score,"#fde0b4");text(ctx,"スコア",score.x + 23,40,17,"#090b0d","left",pixelFont);text(ctx,props.session.score.toLocaleString(),score.x + score.width - 27,78,42,"#07080a","right",digitFont);
+  pixelFrame(ctx,timer,"#a92820");if(drawable(reference?.hourglass))drawImage(ctx,reference?.hourglass,{x:timer.x + 20,y:26,width:49,height:60});text(ctx,"残り時間",timer.x + 80,50,25,"#fff9e9","left",pixelFont);text(ctx,`${props.remaining}`,timer.x + timer.width - 105,76,58,"#fff","center",digitFont);text(ctx,"秒",timer.x + timer.width - 27,76,20,"#fff9e9","center",pixelFont);
+  pixelFrame(ctx,combo,"#fde0b4");text(ctx,"連続",combo.x + combo.width / 2,39,15,"#0a0b0d","center",pixelFont);text(ctx,String(props.session.combo),combo.x + combo.width / 2,76,42,"#a92820","center",digitFont);
+  pixelFrame(ctx,plates,"#fde0b4");if(drawable(reference?.plateStack))drawImage(ctx,reference?.plateStack,{x:plates.x + 10,y:39,width:47,height:34});text(ctx,"お皿",plates.x + 94,39,15,"#0a0b0d","center",pixelFont);text(ctx,String(props.completedPlates),plates.x + 94,76,38,"#090b0d","center",digitFont);
 }
 function drawMenu(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, props: Props, rects: typeof gameRects | typeof portraitGameRects, portrait: boolean) {
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH;
-  drawWordmark(ctx, assets, width / 2, portrait ? 102 : 135, portrait ? 385 : 500);
-  text(ctx, "寿司ネタの ROMAJI を、体で一文字ずつ にぎる 60秒", width / 2, portrait ? 184 : 245, portrait ? 16 : 21, "#58371f", "center", "\"Yu Mincho\", serif");
-  drawMenuSushiPlates(ctx, assets, width, portrait ? 900 : 820);
-  text(ctx, "ランキング名（デモは空欄でもOK）", rects.name.x, rects.name.y - 25, portrait ? 20 : 17, "#392915");
+  const sign = portrait ? { x:55,y:58,width:490,height:130 } : { x:282,y:34,width:636,height:150 };
+  pixelFrame(ctx,sign,"#fde0b4","#ea241b",10);ctx.fillStyle="#bf180f";ctx.fillRect(sign.x+18,sign.y+18,sign.width*.28,sign.height-36);
+  drawSushiPlate(ctx,assets,"maguro",sign.x+sign.width*.16,sign.y+sign.height*.54,portrait?138:176,true);
+  text(ctx,"全身寿司打",sign.x+sign.width*.67,sign.y+sign.height*.46,portrait?40:56,"#08090b","center",pixelFont);
+  text(ctx,"からだで にぎる 60秒",sign.x+sign.width*.67,sign.y+sign.height*.76,portrait?15:20,"#8b6244","center",pixelFont);
+  text(ctx, "ランキング名（デモは空欄でもOK）", rects.name.x, rects.name.y - 25, portrait ? 20 : 17, "#fff5d8");
   paper(ctx, rects.name, "#fffdf4");
-  text(ctx, props.nameError || "1〜20文字・映像は保存しません", width / 2, rects.name.y + rects.name.height + 26, portrait ? 18 : 16, props.nameError ? "#a52e24" : "#5f513d", "center");
+  text(ctx, props.nameError || "1〜20文字・映像は保存しません", width / 2, rects.name.y + rects.name.height + 26, portrait ? 18 : 16, props.nameError ? "#ffb7a8" : "#fff5d8", "center");
   woodButton(ctx, rects.menuCamera, "カメラで遊ぶ", true, !props.playerName); woodButton(ctx, rects.menuPractice, "デモを見る（自動入力）"); woodButton(ctx, rects.menuRanking, "ランキングを見る");
+  woodButton(ctx, rects.menuPoseList, "ポーズ一覧");
 }
 function drawCalibration(ctx: CanvasRenderingContext2D, props: Props, rects: typeof gameRects | typeof portraitGameRects, portrait: boolean) {
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH;
   const cta = resolveCameraCta({ simulation:props.simulation, calibrated:props.cameraCalibrated, starting:props.cameraStarting, hasName:!!props.playerName });
-  text(ctx, props.simulation ? "自動デモ・ランキング対象外" : "カメラを開始して、全身を映してください", width / 2, portrait ? 132 : 150, portrait ? 20 : 28, "#392915", "center");
+  text(ctx, props.simulation ? "自動デモ・ランキング対象外" : "カメラを開始して、全身を映してください", width / 2, portrait ? 132 : 72, portrait ? 20 : 27, portrait ? "#392915" : "#fff4d1", "center", pixelFont);
   drawVideoAndBones(ctx, props, rects.camera);
   if (!portrait) {
-    const guide = { x:650, y:292, width:455, height:315 };
+    const guide = desktopScene.calibrationGuide;
     paper(ctx, guide, "#f7e9c5");
-    text(ctx, "遊び方", guide.x + guide.width / 2, guide.y + 38, 29, "#5a281a", "center", "\"Yu Mincho\", serif");
-    text(ctx, "1", guide.x + 45, guide.y + 94, 26, "#b5372b", "center"); text(ctx, "寿司ネタの ROMAJI を見る", guide.x + 80, guide.y + 94, 19, "#392915");
-    text(ctx, "2", guide.x + 45, guide.y + 151, 26, "#b5372b", "center"); text(ctx, "表示された一文字のポーズをつくる", guide.x + 80, guide.y + 151, 19, "#392915");
-    text(ctx, "3", guide.x + 45, guide.y + 208, 26, "#b5372b", "center"); text(ctx, "400ms キープで一文字成功", guide.x + 80, guide.y + 208, 19, "#392915");
-    text(ctx, "最後の文字で 一皿完成！", guide.x + guide.width / 2, guide.y + 270, 20, "#a53025", "center", "\"Yu Mincho\", serif");
+    text(ctx, "遊び方", guide.x + guide.width / 2, guide.y + 34, 28, "#172a3a", "center", pixelFont);
+    text(ctx, "1", guide.x + 48, guide.y + 88, 24, "#b5372b", "center", digitFont); text(ctx, "寿司ネタの ROMAJI を見る", guide.x + 78, guide.y + 88, 18, "#172a3a");
+    text(ctx, "2", guide.x + 48, guide.y + 137, 24, "#b5372b", "center", digitFont); text(ctx, "表示された一文字のポーズをつくる", guide.x + 78, guide.y + 137, 18, "#172a3a");
+    text(ctx, "3", guide.x + 48, guide.y + 186, 24, "#b5372b", "center", digitFont); text(ctx, "400ms キープで一文字成功", guide.x + 78, guide.y + 186, 18, "#172a3a");
+    text(ctx, "最後の文字で 一皿完成！", guide.x + guide.width / 2, guide.y + 235, 19, "#a53025", "center", pixelFont);
   }
-  paper(ctx, { x:portrait ? 30 : 260, y:portrait ? 492 : rects.camera.y + rects.camera.height + 18, width:portrait ? 540 : 680, height:portrait ? 64 : 48 }, "#fff8e8");
-  wrapped(ctx, props.cameraMessage, width / 2, portrait ? 510 : rects.camera.y + rects.camera.height + 42, portrait ? 22 : 16, props.cameraCalibrated || props.simulation ? "#39714b" : "#a54835", portrait ? 24 : 48);
+  const message = portrait ? { x:30, y:492, width:540, height:64 } : desktopScene.calibrationMessage;
+  paper(ctx, message, "#fff8e8");
+  wrapped(ctx, props.cameraMessage, width / 2, message.y + message.height / 2, portrait ? 22 : 16, props.cameraCalibrated || props.simulation ? "#39714b" : "#a54835", portrait ? 24 : 48);
   woodButton(ctx, rects.calibrationStart, props.simulation ? "自動デモを開始" : cta.label, true, cta.disabled); woodButton(ctx, rects.calibrationBack, "メニューへ");
 }
-function drawPlay(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, props: Props, rects: typeof gameRects | typeof portraitGameRects, portrait: boolean, countdown: number, time: number, animate: boolean) {
+function drawPlay(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, reference: SfUiAssets | undefined, props: Props, rects: typeof gameRects | typeof portraitGameRects, portrait: boolean, countdown: number, time: number, animate: boolean) {
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, accuracy = Math.round((props.session.lastAccuracy ?? 0) * 100);
-  drawHud(ctx, props, width, portrait); drawLane(ctx, assets, props, width, portrait, time, animate);
-  const camera = portrait ? { x:30, y:450, width:315, height:177 } : { x:62, y:470, width:500, height:245 };
-  const guide = portrait ? { x:365, y:450, width:205, height:177 } : { x:690, y:470, width:430, height:280 };
-  drawVideoAndBones(ctx, props, camera); paper(ctx, guide, "#f7e9c5");
-  text(ctx, `ポーズ　${props.target.character}`, guide.x + guide.width / 2, guide.y + 24, portrait ? 17 : 20, "#5a281a", "center");
-  drawTarget(ctx, props.target, { x:guide.x + 7, y:guide.y + 36, width:guide.width - 14, height:guide.height - (portrait ? 47 : 117) });
-  if (portrait) paper(ctx, { x:30, y:638, width:540, height:82 }, "#f7e9c5");
-  const meterX = portrait ? 50 : 712, meterY = portrait ? 672 : 695, meterW = portrait ? 500 : 386;
-  text(ctx, `一致度 ${accuracy}%　目標86%`, meterX, meterY - 16, portrait ? 18 : 17, "#392915");
-  ctx.fillStyle = "#cfbd91"; ctx.fillRect(meterX, meterY, meterW, 11); ctx.fillStyle = "#c84534"; ctx.fillRect(meterX, meterY, meterW * Math.min(1, accuracy / 100), 11);
-  if (props.session.holdSince) text(ctx, `そのままキープ！ ${Math.round(props.hold)}% / 400ms`, meterX, meterY + 30, portrait ? 18 : 15, "#9a3b24");
-  if (props.session.status === "countdown") { const card = portrait ? { x:155, y:285, width:290, height:150 } : { x:435, y:205, width:330, height:178 }; paper(ctx, card, "rgba(255,248,232,.96)"); text(ctx, "ご用意！", card.x + card.width / 2, card.y + 38, 22, "#9a3b24", "center"); text(ctx, String(countdown), card.x + card.width / 2, card.y + 100, portrait ? 55 : 72, "#bd3328", "center"); }
+  drawHud(ctx, reference, props, width, portrait); drawLane(ctx, assets, reference, props, width, portrait, time, animate);
+  const guide = portrait ? { x:30, y:450, width:255, height:177 } : desktopScene.playGuide;
+  const camera = portrait ? { x:300, y:450, width:270, height:177 } : desktopScene.playCamera;
+  if (!portrait && drawable(reference?.poseGuide)) drawImage(ctx,reference?.poseGuide,guide); else paper(ctx,guide,"#fde0b4");
+  pixelFrame(ctx,{x:guide.x+28,y:guide.y-16,width:guide.width-56,height:44},"#fde0b4");
+  text(ctx,"お手本のポーズ",guide.x+guide.width/2,guide.y+5,portrait?14:20,"#172a3a","center",pixelFont);
+  drawTarget(ctx, props.target, { x:guide.x + 12, y:guide.y + 31, width:guide.width - 24, height:guide.height - 39 });
+  if (!portrait && drawable(reference?.poseCamera)) drawImage(ctx,reference?.poseCamera,camera);
+  drawVideoAndBones(ctx, props, camera, !portrait && drawable(reference?.poseCamera));
+  pixelFrame(ctx,{x:camera.x+70,y:camera.y-16,width:camera.width-140,height:44},"#fde0b4");
+  text(ctx,"現在のポーズ",camera.x+camera.width/2,camera.y+5,portrait?14:20,"#172a3a","center",pixelFont);
+  const feedback = portrait ? { x:30, y:638, width:540, height:82 } : desktopScene.playFeedback;
+  paper(ctx, feedback, portrait ? "#f7e9c5" : "#fde0b4");
+  const meterX = feedback.x + (portrait ? 20 : 16), meterY = feedback.y + feedback.height - (portrait ? 22 : 12), meterW = feedback.width - (portrait ? 40 : 32);
+  text(ctx, `一致度 ${accuracy}%　目標86%`, meterX, feedback.y + (portrait ? 21 : 12), portrait ? 18 : 13, "#392915");
+  if (props.session.holdSince) text(ctx, `キープ ${Math.round(props.hold)}%`, meterX + meterW, feedback.y + (portrait ? 21 : 12), portrait ? 18 : 13, "#9a3b24", "right", pixelFont);
+  ctx.fillStyle = "#cfbd91"; ctx.fillRect(meterX, meterY, meterW, portrait ? 11 : 7); ctx.fillStyle = "#c84534"; ctx.fillRect(meterX, meterY, meterW * Math.min(1, accuracy / 100), portrait ? 11 : 7);
+  if (props.session.status === "countdown") { const card = portrait ? { x:155, y:285, width:290, height:150 } : { x:435, y:305, width:330, height:178 }; paper(ctx, card, "rgba(255,248,232,.96)"); text(ctx, "ご用意！", card.x + card.width / 2, card.y + 38, 22, "#9a3b24", "center", pixelFont); text(ctx, String(countdown), card.x + card.width / 2, card.y + 100, portrait ? 55 : 72, "#bd3328", "center", pixelFont); }
   if (props.session.status === "playing") woodButton(ctx, rects.gameSkip, "このおすしを流す");
 }
 function drawResult(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, props: Props, rects: typeof gameRects | typeof portraitGameRects, portrait: boolean) {
-  const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, card = portrait ? { x:30, y:135, width:540, height:755 } : { x:300, y:164, width:600, height:554 };
+  const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, card = portrait ? { x:30, y:135, width:540, height:755 } : { x:300, y:90, width:600, height:530 };
   const successes = props.session.successes.length, average = Math.round(props.session.successes.reduce((sum, item) => sum + item.accuracy, 0) / Math.max(1, successes) * 100);
   const notice = props.rankMessage || (props.simulation ? "自動デモの結果はランキングに登録されません。" : props.rankingEligible ? `登録すると、${props.displayName}さんの名前・結果を保存します。` : "この回はランキング対象外です。");
-  paper(ctx, card, "#fff8e8"); drawWordmark(ctx, assets, width / 2, portrait ? 184 : 207, portrait ? 270 : 300);
-  wrapped(ctx, `${props.displayName}さんの結果`, width / 2, portrait ? 237 : 255, portrait ? 22 : 28, "#392915", 18);
-  text(ctx, `${props.session.score.toLocaleString()} 点`, width / 2, portrait ? 325 : 345, portrait ? 48 : 61, "#bd3328", "center");
-  text(ctx, `${successes}文字入力　完成 ${props.completedPlates}皿`, width / 2, portrait ? 402 : 415, portrait ? 21 : 20, "#5f513d", "center");
-  text(ctx, `最大 ${props.session.maxCombo}連　平均 ${average}%`, width / 2, portrait ? 438 : 447, portrait ? 21 : 20, "#5f513d", "center");
-  wrapped(ctx, notice, width / 2, portrait ? 490 : 510, portrait ? 22 : 16, "#5f513d", portrait ? 24 : 44);
+  paper(ctx, card, "#fff8e8"); text(ctx,"結果発表",width/2,portrait ? 184 : 145,portrait ? 36 : 42,"#172a3a","center",pixelFont);
+  wrapped(ctx, `${props.displayName}さんの結果`, width / 2, portrait ? 237 : 192, portrait ? 22 : 28, "#392915", 18);
+  text(ctx, `${props.session.score.toLocaleString()} 点`, width / 2, portrait ? 325 : 268, portrait ? 48 : 61, "#bd3328", "center",pixelFont);
+  text(ctx, `${successes}文字入力　完成 ${props.completedPlates}皿`, width / 2, portrait ? 402 : 338, portrait ? 21 : 20, "#5f513d", "center");
+  text(ctx, `最大 ${props.session.maxCombo}連　平均 ${average}%`, width / 2, portrait ? 438 : 370, portrait ? 21 : 20, "#5f513d", "center");
+  wrapped(ctx, notice, width / 2, portrait ? 490 : 420, portrait ? 22 : 16, "#5f513d", portrait ? 24 : 44);
   if (props.rankingEligible) woodButton(ctx, rects.resultRegister, props.submitting ? "登録中…" : "ランキングに登録する", true, props.submitting);
   woodButton(ctx, rects.resultRetry, "もう一度にぎる"); woodButton(ctx, rects.resultMenu, "メニューへ");
 }
 function drawRanking(ctx: CanvasRenderingContext2D, props: Props, rects: typeof gameRects | typeof portraitGameRects, portrait: boolean) {
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, card = portrait ? { x:25, y:145, width:550, height:700 } : { x:115, y:176, width:970, height:420 };
-  text(ctx, "ランキング", width / 2, portrait ? 115 : 140, portrait ? 35 : 46, "#23180e", "center", "\"Yu Mincho\", serif"); paper(ctx, card, "rgba(255,248,232,.94)");
+  text(ctx, "ランキング", width / 2, portrait ? 115 : 140, portrait ? 35 : 46, portrait ? "#23180e" : "#fff4d1", "center", pixelFont); paper(ctx, card, "rgba(255,248,232,.94)");
   if (props.rankingStatus === "loading") text(ctx, "番付を読み込み中…", width / 2, portrait ? 470 : 380, 20, "#5f513d", "center");
   else if (props.rankingStatus === "error") { text(ctx, "番付を読み込めませんでした。", width / 2, portrait ? 450 : 420, 20, "#a52e24", "center"); woodButton(ctx, rects.rankingRetry, "もう一度読む"); }
   else if (!props.ranking.length) wrapped(ctx, "まだ記録はありません。最初の一皿をにぎろう！", width / 2, portrait ? 447 : 380, 22, "#5f513d", portrait ? 18 : 30);
@@ -185,27 +264,34 @@ function drawRanking(ctx: CanvasRenderingContext2D, props: Props, rects: typeof 
   else props.ranking.slice(0, 10).forEach((row, index) => { const y = 205 + index * 42; text(ctx, String(index + 1), 170, y, 18, "#9c3928", "right"); text(ctx, truncateCanvasText(row.playerName, 12), 205, y, 19, "#392915"); text(ctx, `${row.solved}文字 / 最大${row.maxCombo}連 / 平均${formatStoredRankingAccuracy(row.averageAccuracy)}`, 560, y, 15, "#5f513d", "center"); text(ctx, `${row.score.toLocaleString()}点`, 1010, y, 19, "#bd3328", "right"); });
   woodButton(ctx, rects.rankingBack, "メニューへ"); woodButton(ctx, rects.rankingRefresh, "ランキングを更新");
 }
-function paintGame(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, props: Props, phase: Phase, portrait: boolean, now: number, animate: boolean) {
+function paintGame(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, reference: SfUiAssets | undefined, props: Props, phase: Phase, portrait: boolean, now: number, animate: boolean) {
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, height = portrait ? PORTRAIT_HEIGHT : GAME_HEIGHT, rects = portrait ? portraitGameRects : gameRects;
   const countdown = props.session.status === "countdown" ? Math.max(1, Math.ceil(((props.session.countdownUntil ?? 0) - performance.now()) / 1000)) : 0;
-  drawWoodBoard(ctx, width, height);
+  drawWoodTexture(ctx, reference, width, height, portrait);
   if (phase === "menu") drawMenu(ctx, assets, props, rects, portrait);
   else if (phase === "calibration") drawCalibration(ctx, props, rects, portrait);
-  else if (phase === "play") drawPlay(ctx, assets, props, rects, portrait, countdown, now, animate);
+  else if (phase === "play") drawPlay(ctx, assets, reference, props, rects, portrait, countdown, now, animate);
   else if (phase === "result") drawResult(ctx, assets, props, rects, portrait);
   else drawRanking(ctx, props, rects, portrait);
 }
 
 export function GameCanvas(props: Props) {
-  const hostRef = useRef<HTMLDivElement>(null), painterRef = useRef<CanvasDriver | undefined>(undefined), assetsRef = useRef<SushiArtAssets | undefined>(undefined);
+  const hostRef = useRef<HTMLDivElement>(null), painterRef = useRef<CanvasDriver | undefined>(undefined), assetsRef = useRef<SushiArtAssets | undefined>(undefined), referenceAssetsRef = useRef<SfUiAssets | undefined>(undefined);
   const stateRef = useRef(props); stateRef.current = props;
   const [status, setStatus] = useState<"loading" | "ready" | "fallback">("loading");
-  const [layoutMode, setLayoutMode] = useState<"portrait" | "landscape">(() => typeof window !== "undefined" && window.innerWidth < 550 ? "portrait" : "landscape");
+  // Keep the server markup and the first hydrated client render identical. The resize pass below
+  // then applies the stable viewport-width mode, which lets React update the data attribute.
+  const [layoutMode, setLayoutMode] = useState<"portrait" | "landscape">("landscape");
   const [viewport, setViewport] = useState(() => fitGameViewport(GAME_WIDTH, GAME_HEIGHT, false));
   const [hover, setHover] = useState("");
   const currentPhase = phaseFor(props), activeRects = layoutMode === "portrait" ? portraitGameRects : gameRects;
   useEffect(() => { painterRef.current?.update(); }, [props, hover]);
-  useEffect(() => { const art = loadSushiArt(() => painterRef.current?.wake()); assetsRef.current = art.assets; return () => art.dispose(); }, []);
+  useEffect(() => {
+    const wake = () => painterRef.current?.wake();
+    const art = loadSushiArt(wake), reference = loadSfUiAssets(wake);
+    assetsRef.current = art.assets; referenceAssetsRef.current = reference.assets;
+    return () => { art.dispose(); reference.dispose(); };
+  }, []);
   useEffect(() => {
     const host = hostRef.current; if (!host) return;
     const canvas = document.createElement("canvas"); canvas.className = "arcade-canvas-2d"; canvas.setAttribute("aria-hidden", "true"); host.prepend(canvas);
@@ -218,29 +304,39 @@ export function GameCanvas(props: Props) {
       if (disposed || (!force && !gate.shouldRender(time))) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
       const transform = canvasBackingTransform(viewportForCanvas, dpr); ctx.setTransform(transform.scale, 0, 0, transform.scale, transform.x, transform.y);
-      paintGame(ctx, assetsRef.current, stateRef.current, phaseFor(stateRef.current), portrait, reduced ? 0 : time, !reduced);
+      paintGame(ctx, assetsRef.current, referenceAssetsRef.current, stateRef.current, phaseFor(stateRef.current), portrait, reduced ? 0 : time, !reduced);
     };
     const stopLoop = () => { if (animationFrame) cancelAnimationFrame(animationFrame); animationFrame = 0; };
     const loop = (time: number) => { render(time); animationFrame = gate.animated ? requestAnimationFrame(loop) : 0; };
     const syncLoop = () => { stopLoop(); if (gate.animated) animationFrame = requestAnimationFrame(loop); };
     const wake = () => { gate.markDirty(); if (!hidden && !offscreen) render(performance.now(), true); syncLoop(); };
-    const resize = () => { width = Math.max(1, host.clientWidth); height = Math.max(1, host.clientHeight); const nextMode = width < 550 ? "portrait" : "landscape"; if (nextMode !== layoutMode) { setLayoutMode(nextMode); return; } const dpr = Math.min(window.devicePixelRatio || 1, 1.5); canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr); viewportForCanvas = fitGameViewport(width, height, portrait); setViewport(viewportForCanvas); wake(); };
+    const resize = () => {
+      width = Math.max(1, host.clientWidth); height = Math.max(1, host.clientHeight);
+      // The host width can be height-capped by its own aspect ratio.  Viewport width is stable,
+      // so it cannot oscillate between portrait and landscape when the canvas resizes itself.
+      const nextMode = gameLayoutModeForWidth(window.innerWidth);
+      if (nextMode !== layoutMode) { setLayoutMode(nextMode); return; }
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
+      viewportForCanvas = fitGameViewport(width, height, portrait); setViewport(viewportForCanvas); wake();
+    };
     const driver: CanvasDriver = { dispose() { disposed = true; gate.dispose(); stopLoop(); canvas.remove(); }, resize, wake, update:wake, setHidden(next) { hidden = next; gate.setHidden(next); if (!next) wake(); else stopLoop(); }, setReducedMotion(next) { reduced = next; gate.setReducedMotion(next); wake(); } };
     const applyLifecycle = () => applyPresentationLifecycle(driver, document.hidden, media.matches);
     const onVisibility = () => applyLifecycle(), onMotionChange = () => applyLifecycle();
     painterRef.current = driver; observer = new ResizeObserver(resize); observer.observe(host);
     intersection = new IntersectionObserver(([entry]) => { offscreen = !entry.isIntersecting; gate.setOffscreen(offscreen); if (!offscreen) wake(); else stopLoop(); }, { threshold:.01 }); intersection.observe(host);
-    media.addEventListener("change", onMotionChange); document.addEventListener("visibilitychange", onVisibility); applyLifecycle(); host.dataset.rendererStatus = "ready"; host.dataset.rendererMode = "2d"; setStatus("ready"); resize();
-    return () => { observer?.disconnect(); intersection?.disconnect(); media.removeEventListener("change", onMotionChange); document.removeEventListener("visibilitychange", onVisibility); driver.dispose(); if (painterRef.current === driver) painterRef.current = undefined; };
+    media.addEventListener("change", onMotionChange); window.addEventListener("resize", resize); document.addEventListener("visibilitychange", onVisibility); applyLifecycle(); host.dataset.rendererStatus = "ready"; host.dataset.rendererMode = "2d"; setStatus("ready"); resize();
+    return () => { observer?.disconnect(); intersection?.disconnect(); media.removeEventListener("change", onMotionChange); window.removeEventListener("resize", resize); document.removeEventListener("visibilitychange", onVisibility); driver.dispose(); if (painterRef.current === driver) painterRef.current = undefined; };
   }, [layoutMode]);
   const overlay = (id: string, rect: Rect, value: string, onClick: () => void, disabled = false) => <button key={id} className="arcade-hit" style={cssRect(rect, viewport)} aria-label={value} disabled={disabled} onClick={onClick} onPointerEnter={() => setHover(id)} onPointerLeave={() => setHover("")} onFocus={() => setHover(id)} onBlur={() => setHover("")}><span className="sr-only">{value}</span></button>;
   const controls = useMemo(() => {
-    if (currentPhase === "menu") return <>{overlay("camera", activeRects.menuCamera, "カメラで遊ぶ", props.onOpenCamera, !props.playerName)}{overlay("demo", activeRects.menuPractice, "デモを見る。自動入力、ランキング対象外", props.onPractice)}{overlay("ranking", activeRects.menuRanking, "ランキングを見る", props.onRankings)}</>;
+    if (currentPhase === "menu") return <>{overlay("camera", activeRects.menuCamera, "カメラで遊ぶ", props.onOpenCamera, !props.playerName)}{overlay("demo", activeRects.menuPractice, "デモを見る。自動入力、ランキング対象外", props.onPractice)}{overlay("ranking", activeRects.menuRanking, "ランキングを見る", props.onRankings)}{overlay("poseList", activeRects.menuPoseList, "ポーズ一覧を開く", props.onOpenPoseList)}</>;
     if (currentPhase === "calibration") { const cta = resolveCameraCta({ simulation:props.simulation, calibrated:props.cameraCalibrated, starting:props.cameraStarting, hasName:!!props.playerName }); return <>{overlay("start", activeRects.calibrationStart, props.simulation ? "自動デモを開始" : cta.label, cta.action === "start-camera" ? props.onStartCamera : props.onStart, cta.disabled)}{overlay("back", activeRects.calibrationBack, "メニューへ", props.onBackMenu)}</>; }
     if (currentPhase === "play") return props.session.status === "playing" ? overlay("skip", activeRects.gameSkip, "このおすしを流す。コンボは0になります", props.onSkip) : null;
     if (currentPhase === "result") return <>{props.rankingEligible && overlay("register", activeRects.resultRegister, "ランキングに登録する", props.onRegister, props.submitting)}{overlay("retry", activeRects.resultRetry, "もう一度にぎる", props.onRetry)}{overlay("menu", activeRects.resultMenu, "メニューへ", props.onBackMenu)}</>;
     return <>{props.rankingStatus === "error" && overlay("rankRetry", activeRects.rankingRetry, "もう一度読む", props.onFetchRanks)}{overlay("rankBack", activeRects.rankingBack, "メニューへ", props.onBackMenu)}{overlay("rankRefresh", activeRects.rankingRefresh, "ランキングを更新", props.onFetchRanks)}</>;
   }, [activeRects, currentPhase, props, viewport]);
   const currentWord = props.wordProgress.word;
-  return <main className="arcade-shell"><div ref={hostRef} className="arcade-canvas" data-renderer-status={status} data-renderer-mode="2d"><div className="arcade-controls">{controls}{currentPhase === "menu" && <input className="arcade-name" style={cssRect(activeRects.name, viewport)} value={props.rankName} maxLength={20} aria-label="ランキング名" placeholder="例：すし太郎" onChange={event => props.onNameChange(event.target.value)} />}</div>{status === "fallback" && <div className="arcade-fallback">このブラウザでは2D描画を開始できませんでした。再読み込みしてください。</div>}</div><section className="sr-only" aria-label="全身寿司打の現在の画面"><h1>全身寿司打</h1><p>{currentPhase === "menu" ? "メニュー" : currentPhase === "calibration" ? props.cameraMessage : currentPhase === "play" ? `残り${props.remaining}秒、${currentWord.name}、${currentWord.romaji.toUpperCase()}の${props.target.character}、得点${props.session.score}、${props.session.combo}連、完成${props.completedPlates}皿` : currentPhase === "result" ? `${props.displayName}さんの結果。${props.session.score}点、${props.session.successes.length}文字成功、完成${props.completedPlates}皿` : "ランキング"}</p>{currentPhase === "play" && <p>現在の文字は {props.target.character}。一致度 {Math.round((props.session.lastAccuracy ?? 0) * 100)} パーセント。</p>}{currentPhase === "result" && <p>{props.simulation ? "自動デモの結果はランキングに登録されません。" : props.rankingEligible ? `登録すると、${props.displayName}さんの名前、得点、成功数をD1ランキングへ保存します。` : "この回はランキング対象外です。"} {props.rankMessage}</p>}{currentPhase === "ranking" && <ol>{props.ranking.map((row, index) => <li key={`${row.createdAt}-${index}`}>{index + 1}位 {row.playerName}、{row.score}点、{row.solved}文字、平均{formatStoredRankingAccuracy(row.averageAccuracy)}</li>)}</ol>}</section></main>;
+  const nameStyle = { ...cssRect(activeRects.name, viewport), fontSize: `${Math.max(14, Math.min(22, activeRects.name.height * viewport.scale * .42))}px` };
+  return <main className="arcade-shell" data-layout={layoutMode}><div ref={hostRef} className="arcade-canvas" data-layout={layoutMode} data-renderer-status={status} data-renderer-mode="2d"><div className="arcade-controls">{controls}{currentPhase === "menu" && <input className="arcade-name" style={nameStyle} value={props.rankName} maxLength={20} aria-label="ランキング名" placeholder="例：すし太郎" onChange={event => props.onNameChange(event.target.value)} />}</div>{status === "fallback" && <div className="arcade-fallback">このブラウザでは2D描画を開始できませんでした。再読み込みしてください。</div>}</div><section className="sr-only" aria-label="全身寿司打の現在の画面"><h1>全身寿司打</h1><p>{currentPhase === "menu" ? "メニュー" : currentPhase === "calibration" ? props.cameraMessage : currentPhase === "play" ? `残り${props.remaining}秒、${currentWord.name}、${currentWord.romaji.toUpperCase()}の${props.target.character}、得点${props.session.score}、${props.session.combo}連、完成${props.completedPlates}皿` : currentPhase === "result" ? `${props.displayName}さんの結果。${props.session.score}点、${props.session.successes.length}文字成功、完成${props.completedPlates}皿` : "ランキング"}</p>{currentPhase === "play" && <p>現在の文字は {props.target.character}。一致度 {Math.round((props.session.lastAccuracy ?? 0) * 100)} パーセント。</p>}{currentPhase === "result" && <p>{props.simulation ? "自動デモの結果はランキングに登録されません。" : props.rankingEligible ? `登録すると、${props.displayName}さんの名前、得点、成功数をD1ランキングへ保存します。` : "この回はランキング対象外です。"} {props.rankMessage}</p>}{currentPhase === "ranking" && <ol>{props.ranking.map((row, index) => <li key={`${row.createdAt}-${index}`}>{index + 1}位 {row.playerName}、{row.score}点、{row.solved}文字、平均{formatStoredRankingAccuracy(row.averageAccuracy)}</li>)}</ol>}</section></main>;
 }
