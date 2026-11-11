@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { GameSession } from "../lib/engine";
-import { GAME_HEIGHT, GAME_WIDTH, PORTRAIT_HEIGHT, PORTRAIT_WIDTH, canvasBackingTransform, containVideo, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, portraitGameRects, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText, type Rect } from "../lib/game-canvas-layout";
+import { GAME_HEIGHT, GAME_WIDTH, PORTRAIT_HEIGHT, PORTRAIT_WIDTH, canvasBackingTransform, containVideo, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText, type Rect } from "../lib/game-canvas-layout";
 import { formatStoredRankingAccuracy } from "../lib/game-ui";
 import { applyPresentationLifecycle } from "../lib/presentation-lifecycle";
 import { resolveCameraCta } from "../lib/camera-cta";
@@ -12,6 +12,7 @@ import type { SushiWord, SushiWordProgress } from "../lib/sushi-words";
 import { SushiSceneFrameGate } from "../lib/sushi-scene-lifecycle";
 import { drawSushiPlate, drawWordmark, loadSushiArt, type SushiArtAssets } from "../lib/sushi-art-2d";
 import { drawable, loadSfUiAssets, type SfUiAssets } from "../lib/sf-ui-assets";
+import { drawRankingCrown } from "../lib/ranking-crown";
 
 type RankEntry = { playerName: string; score: number; solved: number; maxCombo: number; averageAccuracy: number; createdAt: number };
 type View = "menu" | "game" | "ranking";
@@ -20,10 +21,10 @@ type Props = {
   view: View; session: GameSession; target: PoseTemplate; wordProgress: SushiWordProgress; upcomingWords: SushiWord[]; completedPlates: number;
   remaining: number; hold: number; displayName: string; playerName: string; nameError?: string; rankName: string;
   simulation: boolean; rankingEligible: boolean; cameraCalibrated: boolean; cameraStarting: boolean; cameraMessage: string; landmarks?: Landmark[];
-  ranking: RankEntry[]; rankingStatus: "loading" | "ready" | "error"; rankMessage: string; rankError?: string; submitting: boolean;
+  ranking: RankEntry[]; rankingStatus: "loading" | "ready" | "error"; rankingPage: number; rankMessage: string; rankError?: string; submitting: boolean;
   videoRef: RefObject<HTMLVideoElement | null>; poseCanvasRef: RefObject<HTMLCanvasElement | null>;
   onNameChange(name: string): void; onOpenCamera(): void; onPractice(): void; onRankings(): void; onOpenPoseList(): void; onBackMenu(): void;
-  onStartCamera(): void; onStart(): void; onSkip(): void; onRegister(): void; onRetry(): void; onFetchRanks(): void;
+  onStartCamera(): void; onStart(): void; onSkip(): void; onRegister(): void; onRetry(): void; onFetchRanks(): void; onRankingPage(page: number): void;
 };
 type CanvasDriver = { dispose(): void; resize(): void; wake(): void; update(): void; setHidden(hidden: boolean): void; setReducedMotion(reduced: boolean): void };
 
@@ -254,15 +255,51 @@ function drawResult(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | unde
   if (props.rankingEligible) woodButton(ctx, rects.resultRegister, props.submitting ? "登録中…" : "ランキングに登録する", true, props.submitting);
   woodButton(ctx, rects.resultRetry, "もう一度にぎる"); woodButton(ctx, rects.resultMenu, "メニューへ");
 }
-function drawRanking(ctx: CanvasRenderingContext2D, props: Props, rects: typeof gameRects | typeof portraitGameRects, portrait: boolean) {
-  const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, card = portrait ? { x:25, y:145, width:550, height:700 } : { x:115, y:176, width:970, height:420 };
-  text(ctx, "ランキング", width / 2, portrait ? 115 : 140, portrait ? 35 : 46, portrait ? "#23180e" : "#fff4d1", "center", pixelFont); paper(ctx, card, "rgba(255,248,232,.94)");
-  if (props.rankingStatus === "loading") text(ctx, "番付を読み込み中…", width / 2, portrait ? 470 : 380, 20, "#5f513d", "center");
-  else if (props.rankingStatus === "error") { text(ctx, "番付を読み込めませんでした。", width / 2, portrait ? 450 : 420, 20, "#a52e24", "center"); woodButton(ctx, rects.rankingRetry, "もう一度読む"); }
-  else if (!props.ranking.length) wrapped(ctx, "まだ記録はありません。最初の一皿をにぎろう！", width / 2, portrait ? 447 : 380, 22, "#5f513d", portrait ? 18 : 30);
-  else if (portrait) props.ranking.slice(0, 10).forEach((row, index) => { const y = 185 + index * 60; text(ctx, String(index + 1), 62, y, 16, "#9c3928", "right"); text(ctx, truncateCanvasText(row.playerName, 14), 82, y, 16, "#392915"); text(ctx, `${row.score.toLocaleString()}点`, 540, y, 16, "#bd3328", "right"); text(ctx, `${row.solved}文字 / 最大${row.maxCombo}連 / 平均${formatStoredRankingAccuracy(row.averageAccuracy)}`, 300, y + 27, 16, "#5f513d", "center"); });
-  else props.ranking.slice(0, 10).forEach((row, index) => { const y = 205 + index * 42; text(ctx, String(index + 1), 170, y, 18, "#9c3928", "right"); text(ctx, truncateCanvasText(row.playerName, 12), 205, y, 19, "#392915"); text(ctx, `${row.solved}文字 / 最大${row.maxCombo}連 / 平均${formatStoredRankingAccuracy(row.averageAccuracy)}`, 560, y, 15, "#5f513d", "center"); text(ctx, `${row.score.toLocaleString()}点`, 1010, y, 19, "#bd3328", "right"); });
-  woodButton(ctx, rects.rankingBack, "メニューへ"); woodButton(ctx, rects.rankingRefresh, "ランキングを更新");
+function crown(ctx: CanvasRenderingContext2D, x: number, y: number, value: number, fill: string, scale = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+  ctx.fillStyle = "#1c110b"; ctx.fillRect(-24, -3, 48, 31); ctx.fillStyle = fill;
+  ctx.beginPath(); ctx.moveTo(-20, 4); ctx.lineTo(-21, -21); ctx.lineTo(-7, -8); ctx.lineTo(0, -30); ctx.lineTo(8, -8); ctx.lineTo(21, -21); ctx.lineTo(20, 4); ctx.closePath(); ctx.fill(); ctx.fillRect(-20, 4, 40, 17); ctx.strokeStyle = "#fff4cf"; ctx.lineWidth = 3; ctx.stroke(); text(ctx, String(value), 0, 14, 18, "#17100a", "center", digitFont); ctx.restore();
+}
+function fittedRankingText(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, preferred: number, minimum: number, maxWidth: number, color: string, align: CanvasTextAlign, family: string) {
+  const size = fittedTextSize(next => { ctx.font = `800 ${next}px ${family}`; return ctx.measureText(value).width; }, preferred, minimum, maxWidth);
+  text(ctx, value, x, y, size, color, align, family);
+}
+function rankRow(ctx: CanvasRenderingContext2D, row: RankEntry, rank: number, y: number, x: number, width: number, height: number, portrait: boolean, cells: { name: { x:number; width:number }; score: { x:number; width:number } }) {
+  const fill = rank === 1 ? "#ffc51b" : rank === 2 ? "#c7cbd0" : rank === 3 ? "#f89b15" : "#fde0b4", border = rank <= 3 ? "#b34b12" : "#a84921";
+  ctx.fillStyle = fill; ctx.fillRect(x + 7, y, width - 14, height); ctx.fillRect(x, y + 7, width, height - 14); ctx.strokeStyle = border; ctx.lineWidth = 2; ctx.strokeRect(x + 7, y + 1, width - 14, height - 2);
+  const rowRect = { x, y, width, height };
+  if (rank <= 3) drawRankingCrown(ctx, rankingCrownRect(rowRect, portrait), rank, fill, digitFont); else { const badge = { x:x + (portrait ? 23 : 70), y:y + 5, width:54, height:height - 10 }; pixelFrame(ctx, badge, "#fde0b4", border, 4); text(ctx, String(rank), badge.x + badge.width / 2, y + height / 2 + 1, portrait ? 16 : 25, "#130f0a", "center", digitFont); }
+  fittedRankingText(ctx, row.playerName, cells.name.x, y + height / 2 + 1, portrait ? 17 : 23, 12, cells.name.width, "#100d09", "left", pixelFont); fittedRankingText(ctx, row.score.toLocaleString(), cells.score.x + cells.score.width / 2, y + height / 2 + 1, portrait ? 18 : 30, portrait ? 13 : 20, cells.score.width, "#100d09", "center", digitFont);
+}
+function rankPageButton(ctx: CanvasRenderingContext2D, rect: Rect, label: string, selected: boolean, disabled: boolean) { pixelFrame(ctx, rect, disabled ? "#b29d7d" : selected ? "#af241e" : "#fde0b4", "#170e09", 5); text(ctx, label, rect.x + rect.width / 2, rect.y + rect.height / 2 + 1, rect.height > 52 ? 23 : 18, selected ? "#fff5dc" : disabled ? "#eee0c5" : "#130e0a", "center", pixelFont); }
+function rankingBoard(ctx: CanvasRenderingContext2D, rect: Rect, inner: Rect) {
+  ctx.fillStyle = "#0c0b0a"; ctx.fillRect(rect.x + 14, rect.y, rect.width - 28, rect.height); ctx.fillRect(rect.x, rect.y + 14, rect.width, rect.height - 28);
+  ctx.fillStyle = "#ffe9c5"; ctx.fillRect(rect.x + 20, rect.y + 8, rect.width - 40, rect.height - 16); ctx.fillRect(rect.x + 8, rect.y + 20, rect.width - 16, rect.height - 40);
+  ctx.fillStyle = "#8e3515"; ctx.fillRect(rect.x + 28, rect.y + 17, rect.width - 56, rect.height - 34); ctx.fillRect(rect.x + 17, rect.y + 28, rect.width - 34, rect.height - 56);
+  ctx.fillStyle = "#ffdcae"; ctx.fillRect(inner.x + 11, inner.y, inner.width - 22, inner.height); ctx.fillRect(inner.x, inner.y + 11, inner.width, inner.height - 22);
+}
+function drawRankingBackdrop(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, width: number, height: number, portrait: boolean) {
+  const beltBottom = portrait ? 145 : 135, navyBottom = portrait ? 804 : 536;
+  ctx.fillStyle = "#172a3a"; ctx.fillRect(0, 20, width, beltBottom - 20);
+  const beltDishes = ["ebi", "tako", "hotate", "uni"] as const;
+  for (let x = -18, index = 0; x < width + 90; x += portrait ? 124 : 152, index++) { ctx.fillStyle = "#22354a"; ctx.fillRect(x, 28, portrait ? 108 : 136, beltBottom - 34); ctx.strokeStyle = "#0b1016"; ctx.lineWidth = 3; ctx.strokeRect(x, 28, portrait ? 108 : 136, beltBottom - 34); drawSushiPlate(ctx, assets, beltDishes[index % beltDishes.length]!, x + (portrait ? 53 : 68), 73, portrait ? 62 : 78); }
+  if (!portrait) { drawLantern(ctx, 46, 82); drawLantern(ctx, width - 46, 82, true); }
+  ctx.fillStyle = "#172a3a"; ctx.fillRect(0, beltBottom, width, navyBottom - beltBottom); drawCornerWave(ctx, portrait ? 25 : 55, navyBottom - 96); drawCornerWave(ctx, portrait ? width - 25 : width - 55, navyBottom - 96, true);
+  ctx.fillStyle = "#a9430d"; ctx.fillRect(0, navyBottom, width, height - navyBottom); for (let x = 0; x < width; x += portrait ? 75 : 95) { ctx.fillStyle = "#572007"; ctx.fillRect(x, navyBottom, 6, height - navyBottom); ctx.fillStyle = "rgba(255,162,53,.25)"; ctx.fillRect(x + 12, navyBottom + 6, 3, height - navyBottom - 12); }
+}
+function drawRanking(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, reference: SfUiAssets | undefined, props: Props, rects: typeof gameRects | typeof portraitGameRects, portrait: boolean) {
+  const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, sign = portrait ? { x:54, y:8, width:492, height:122 } : { x:353, y:4, width:494, height:122 }, geometry = rankingCanvasGeometry(portrait), { card, inner, table, headerY, columns } = geometry;
+  drawRankingBackdrop(ctx, assets, width, portrait ? PORTRAIT_HEIGHT : GAME_HEIGHT, portrait); if (drawable(reference?.rankingTitle)) drawImage(ctx, reference?.rankingTitle, sign); else { pixelFrame(ctx, sign, "#fde0b4", "#ef2419", 10); ctx.fillStyle = "#c7110d"; ctx.fillRect(sign.x + 16, sign.y + 16, sign.width - 32, 6); crown(ctx, width / 2, sign.y + 11, 0, "#ffc81b", portrait ? .58 : .68); text(ctx, "ランキング", width / 2, sign.y + sign.height * .48, portrait ? 37 : 43, "#08090b", "center", pixelFont); text(ctx, "R A N K I N G", width / 2, sign.y + sign.height * .76, portrait ? 11 : 12, "#865236", "center", pixelFont); } rankingBoard(ctx, card, inner);
+  text(ctx, "順位", columns.rankCenter, headerY, portrait ? 18 : 22, "#130e0a", "center", pixelFont); text(ctx, "ニックネーム", columns.name.x, headerY, portrait ? 18 : 22, "#130e0a", "left", pixelFont); text(ctx, "スコア", columns.score.x + columns.score.width / 2, headerY, portrait ? 18 : 22, "#130e0a", "center", pixelFont);
+  for (const checkerX of [table.x + table.width * .26, table.x + table.width * .69]) { ctx.fillStyle = "#ad411b"; for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) ctx.fillRect(checkerX + i * 8, headerY - 13 + j * 8, 5, 5); }
+  const pageStart = props.rankingPage * 10, rows = props.ranking.slice(pageStart, pageStart + 10);
+  if (props.rankingStatus === "loading") text(ctx, "番付を読み込み中…", width / 2, portrait ? 490 : 385, 20, "#5f513d", "center", pixelFont);
+  else if (props.rankingStatus === "error") { text(ctx, "番付を読み込めませんでした。", width / 2, portrait ? 465 : 382, 20, "#a52e24", "center", pixelFont); woodButton(ctx, rects.rankingRetry, "もう一度読む", true); }
+  else if (!props.ranking.length) wrapped(ctx, "まだ記録はありません。最初の一皿をにぎろう！", width / 2, portrait ? 465 : 382, 22, "#5f513d", portrait ? 18 : 30);
+  else rows.forEach((row, index) => rankRow(ctx, row, pageStart + index + 1, table.y + index * table.row, table.x, table.width, table.row - 2, portrait, columns));
+  const pages = Math.max(1, Math.min(4, Math.ceil(props.ranking.length / 10))), pageRects = [rects.rankingPage1, rects.rankingPage2, rects.rankingPage3, rects.rankingPage4];
+  const navigationDisabled = props.rankingStatus === "loading"; rankPageButton(ctx, rects.rankingPrevious, "◀", false, navigationDisabled || props.rankingPage === 0 || !props.ranking.length); pageRects.forEach((rect, page) => rankPageButton(ctx, rect, String(page + 1), page === props.rankingPage, navigationDisabled || page >= pages || !props.ranking.length)); rankPageButton(ctx, rects.rankingNext, "▶", false, navigationDisabled || props.rankingPage >= pages - 1 || !props.ranking.length);
+  if (drawable(reference?.rankingBack) && drawable(reference?.rankingRefresh)) { drawImage(ctx, reference?.rankingBack, rects.rankingBack); ctx.save(); if (props.rankingStatus === "loading") ctx.globalAlpha = .52; drawImage(ctx, reference?.rankingRefresh, rects.rankingRefresh); ctx.restore(); } else { woodButton(ctx, rects.rankingBack, "メニューへ戻る"); woodButton(ctx, rects.rankingRefresh, "ランキングを更新", true, props.rankingStatus === "loading"); }
 }
 function paintGame(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, reference: SfUiAssets | undefined, props: Props, phase: Phase, portrait: boolean, now: number, animate: boolean) {
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, height = portrait ? PORTRAIT_HEIGHT : GAME_HEIGHT, rects = portrait ? portraitGameRects : gameRects;
@@ -272,7 +309,7 @@ function paintGame(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undef
   else if (phase === "calibration") drawCalibration(ctx, props, rects, portrait);
   else if (phase === "play") drawPlay(ctx, assets, reference, props, rects, portrait, countdown, now, animate);
   else if (phase === "result") drawResult(ctx, assets, props, rects, portrait);
-  else drawRanking(ctx, props, rects, portrait);
+  else drawRanking(ctx, assets, reference, props, rects, portrait);
 }
 
 export function GameCanvas(props: Props) {
@@ -328,15 +365,18 @@ export function GameCanvas(props: Props) {
     media.addEventListener("change", onMotionChange); window.addEventListener("resize", resize); document.addEventListener("visibilitychange", onVisibility); applyLifecycle(); host.dataset.rendererStatus = "ready"; host.dataset.rendererMode = "2d"; setStatus("ready"); resize();
     return () => { observer?.disconnect(); intersection?.disconnect(); media.removeEventListener("change", onMotionChange); window.removeEventListener("resize", resize); document.removeEventListener("visibilitychange", onVisibility); driver.dispose(); if (painterRef.current === driver) painterRef.current = undefined; };
   }, [layoutMode]);
-  const overlay = (id: string, rect: Rect, value: string, onClick: () => void, disabled = false) => <button key={id} className="arcade-hit" style={cssRect(rect, viewport)} aria-label={value} disabled={disabled} onClick={onClick} onPointerEnter={() => setHover(id)} onPointerLeave={() => setHover("")} onFocus={() => setHover(id)} onBlur={() => setHover("")}><span className="sr-only">{value}</span></button>;
+  const overlay = (id: string, rect: Rect, value: string, onClick: () => void, disabled = false, current = false) => <button key={id} className="arcade-hit" style={cssRect(rect, viewport)} aria-label={value} aria-current={current ? "page" : undefined} disabled={disabled} onClick={onClick} onPointerEnter={() => setHover(id)} onPointerLeave={() => setHover("")} onFocus={() => setHover(id)} onBlur={() => setHover("")}><span className="sr-only">{value}</span></button>;
   const controls = useMemo(() => {
     if (currentPhase === "menu") return <>{overlay("camera", activeRects.menuCamera, "カメラで遊ぶ", props.onOpenCamera, !props.playerName)}{overlay("demo", activeRects.menuPractice, "デモを見る。自動入力、ランキング対象外", props.onPractice)}{overlay("ranking", activeRects.menuRanking, "ランキングを見る", props.onRankings)}{overlay("poseList", activeRects.menuPoseList, "ポーズ一覧を開く", props.onOpenPoseList)}</>;
     if (currentPhase === "calibration") { const cta = resolveCameraCta({ simulation:props.simulation, calibrated:props.cameraCalibrated, starting:props.cameraStarting, hasName:!!props.playerName }); return <>{overlay("start", activeRects.calibrationStart, props.simulation ? "自動デモを開始" : cta.label, cta.action === "start-camera" ? props.onStartCamera : props.onStart, cta.disabled)}{overlay("back", activeRects.calibrationBack, "メニューへ", props.onBackMenu)}</>; }
     if (currentPhase === "play") return props.session.status === "playing" ? overlay("skip", activeRects.gameSkip, "このおすしを流す。コンボは0になります", props.onSkip) : null;
     if (currentPhase === "result") return <>{props.rankingEligible && overlay("register", activeRects.resultRegister, "ランキングに登録する", props.onRegister, props.submitting)}{overlay("retry", activeRects.resultRetry, "もう一度にぎる", props.onRetry)}{overlay("menu", activeRects.resultMenu, "メニューへ", props.onBackMenu)}</>;
-    return <>{props.rankingStatus === "error" && overlay("rankRetry", activeRects.rankingRetry, "もう一度読む", props.onFetchRanks)}{overlay("rankBack", activeRects.rankingBack, "メニューへ", props.onBackMenu)}{overlay("rankRefresh", activeRects.rankingRefresh, "ランキングを更新", props.onFetchRanks)}</>;
+    const pages = Math.max(1, Math.min(4, Math.ceil(props.ranking.length / 10))), pageRects = [activeRects.rankingPage1, activeRects.rankingPage2, activeRects.rankingPage3, activeRects.rankingPage4];
+    const loading = props.rankingStatus === "loading";
+    return <>{props.rankingStatus === "error" && overlay("rankRetry", activeRects.rankingRetry, "もう一度読む", props.onFetchRanks)}{overlay("rankBack", activeRects.rankingBack, "メニューへ戻る", props.onBackMenu)}{overlay("rankRefresh", activeRects.rankingRefresh, "ランキングを更新", props.onFetchRanks, loading)}{overlay("rankPrevious", activeRects.rankingPrevious, "前のページ", () => props.onRankingPage(props.rankingPage - 1), loading || props.rankingPage === 0 || !props.ranking.length)}{pageRects.map((rect, page) => overlay(`rankPage${page + 1}`, rect, `${page + 1}ページ`, () => props.onRankingPage(page), loading || page >= pages || page === props.rankingPage || !props.ranking.length, page === props.rankingPage && page < pages && !!props.ranking.length))}{overlay("rankNext", activeRects.rankingNext, "次のページ", () => props.onRankingPage(props.rankingPage + 1), loading || props.rankingPage >= pages - 1 || !props.ranking.length)}</>;
   }, [activeRects, currentPhase, props, viewport]);
   const currentWord = props.wordProgress.word;
   const nameStyle = { ...cssRect(activeRects.name, viewport), fontSize: `${Math.max(14, Math.min(22, activeRects.name.height * viewport.scale * .42))}px` };
-  return <main className="arcade-shell" data-layout={layoutMode}><div ref={hostRef} className="arcade-canvas" data-layout={layoutMode} data-renderer-status={status} data-renderer-mode="2d"><div className="arcade-controls">{controls}{currentPhase === "menu" && <input className="arcade-name" style={nameStyle} value={props.rankName} maxLength={20} aria-label="ランキング名" placeholder="例：すし太郎" onChange={event => props.onNameChange(event.target.value)} />}</div>{status === "fallback" && <div className="arcade-fallback">このブラウザでは2D描画を開始できませんでした。再読み込みしてください。</div>}</div><section className="sr-only" aria-label="全身寿司打の現在の画面"><h1>全身寿司打</h1><p>{currentPhase === "menu" ? "メニュー" : currentPhase === "calibration" ? props.cameraMessage : currentPhase === "play" ? `残り${props.remaining}秒、${currentWord.name}、${currentWord.romaji.toUpperCase()}の${props.target.character}、得点${props.session.score}、${props.session.combo}連、完成${props.completedPlates}皿` : currentPhase === "result" ? `${props.displayName}さんの結果。${props.session.score}点、${props.session.successes.length}文字成功、完成${props.completedPlates}皿` : "ランキング"}</p>{currentPhase === "play" && <p>現在の文字は {props.target.character}。一致度 {Math.round((props.session.lastAccuracy ?? 0) * 100)} パーセント。</p>}{currentPhase === "result" && <p>{props.simulation ? "自動デモの結果はランキングに登録されません。" : props.rankingEligible ? `登録すると、${props.displayName}さんの名前、得点、成功数をD1ランキングへ保存します。` : "この回はランキング対象外です。"} {props.rankMessage}</p>}{currentPhase === "ranking" && <ol>{props.ranking.map((row, index) => <li key={`${row.createdAt}-${index}`}>{index + 1}位 {row.playerName}、{row.score}点、{row.solved}文字、平均{formatStoredRankingAccuracy(row.averageAccuracy)}</li>)}</ol>}</section></main>;
+  const visibleRanks = props.ranking.slice(props.rankingPage * 10, props.rankingPage * 10 + 10);
+  return <main className="arcade-shell" data-layout={layoutMode}><div ref={hostRef} className="arcade-canvas" data-layout={layoutMode} data-renderer-status={status} data-renderer-mode="2d"><div className="arcade-controls">{controls}{currentPhase === "menu" && <input className="arcade-name" style={nameStyle} value={props.rankName} maxLength={20} aria-label="ランキング名" placeholder="例：すし太郎" onChange={event => props.onNameChange(event.target.value)} />}</div>{status === "fallback" && <div className="arcade-fallback">このブラウザでは2D描画を開始できませんでした。再読み込みしてください。</div>}</div><section className="sr-only" aria-label="全身寿司打の現在の画面"><h1>全身寿司打</h1><p>{currentPhase === "menu" ? "メニュー" : currentPhase === "calibration" ? props.cameraMessage : currentPhase === "play" ? `残り${props.remaining}秒、${currentWord.name}、${currentWord.romaji.toUpperCase()}の${props.target.character}、得点${props.session.score}、${props.session.combo}連、完成${props.completedPlates}皿` : currentPhase === "result" ? `${props.displayName}さんの結果。${props.session.score}点、${props.session.successes.length}文字成功、完成${props.completedPlates}皿` : `ランキング ${props.rankingPage + 1}ページ`}</p>{currentPhase === "play" && <p>現在の文字は {props.target.character}。一致度 {Math.round((props.session.lastAccuracy ?? 0) * 100)} パーセント。</p>}{currentPhase === "result" && <p>{props.simulation ? "自動デモの結果はランキングに登録されません。" : props.rankingEligible ? `登録すると、${props.displayName}さんの名前、得点、成功数をD1ランキングへ保存します。` : "この回はランキング対象外です。"} {props.rankMessage}</p>}{currentPhase === "ranking" && <>{props.rankingStatus === "loading" && <p role="status">番付を読み込み中です。</p>}{props.rankingStatus === "error" && <p role="alert">番付を読み込めませんでした。</p>}{props.rankingStatus === "ready" && !props.ranking.length && <p>まだ記録はありません。最初の一皿をにぎろう！</p>}<ol start={props.rankingPage * 10 + 1}>{visibleRanks.map((row, index) => <li key={`${row.createdAt}-${index}`}>{props.rankingPage * 10 + index + 1}位 {row.playerName}、{row.score}点、{row.solved}文字、平均{formatStoredRankingAccuracy(row.averageAccuracy)}</li>)}</ol></>}</section></main>;
 }

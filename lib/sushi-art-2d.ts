@@ -2,7 +2,24 @@ import { SUSHI_WORDS, sushiWord, type SushiWordId } from "./sushi-words";
 
 /** Canvas art helpers for the original local sushi illustration atlas. */
 export type SushiArtId = SushiWordId;
-export type SushiArtAssets = { atlas?: HTMLImageElement; extraAtlas?: HTMLImageElement; wordmark?: HTMLImageElement };
+export const PROVIDED_SUSHI_SVG_SOURCES = {
+  akagai: "/assets/sushi-svg/AKAGAI.svg",
+  binchoumaguro: "/assets/sushi-svg/BINCHOUMAGURO.svg",
+  ebi: "/assets/sushi-svg/EBI.svg",
+  hotate: "/assets/sushi-svg/HOTATE.svg",
+  ikura: "/assets/sushi-svg/IKURA.svg",
+  negitoro: "/assets/sushi-svg/NEGITORO.svg",
+  saba: "/assets/sushi-svg/SABA.svg",
+  tako: "/assets/sushi-svg/TAKO.svg",
+  uni: "/assets/sushi-svg/UNI.svg",
+} as const;
+type ProvidedSushiSvgId = keyof typeof PROVIDED_SUSHI_SVG_SOURCES;
+export type SushiArtAssets = {
+  atlas?: HTMLImageElement;
+  extraAtlas?: HTMLImageElement;
+  wordmark?: HTMLImageElement;
+  svg?: Partial<Record<ProvidedSushiSvgId, HTMLImageElement>>;
+};
 
 type AtlasArtId = "maguro" | "tamago" | "ebi" | "ika" | "ikura" | "uni" | "tako" | "saba";
 type SushiStyle = "fish" | "shell" | "shrimp" | "gunkan" | "maki" | "inari" | "eel" | "octopus" | "roe" | "egg" | "sea-cucumber";
@@ -29,6 +46,8 @@ const vectorToppings: Record<SushiArtId, VectorTopping> = {
   inari: { style: "inari", fill: "#c27a32", accent: "#f1c272" }, tobiko: { style: "roe", fill: "#ed8c2d", accent: "#ffc859" },
   masago: { style: "roe", fill: "#dd7042", accent: "#ffaf68" }, aburimaguro: { style: "fish", fill: "#d68258", accent: "#70422e" },
   ootoro: { style: "fish", fill: "#f29c9d", accent: "#fff0e1" }, negitoro: { style: "gunkan", fill: "#c95f58", accent: "#76a960" },
+  hotate: { style: "shell", fill: "#e6b994", accent: "#fff0d1" },
+  binchoumaguro: { style: "fish", fill: "#d78379", accent: "#ffe0cd" },
 };
 export const SUSHI_ART_IDS = Object.keys(vectorToppings) as SushiArtId[];
 
@@ -36,9 +55,13 @@ export const SUSHI_ATLAS_SOURCE = "/assets/sushi-atlas-v2.png";
 export const SUSHI_EXTRA_ATLAS_SOURCE = "/assets/sushi-atlas-extra-v1.png";
 export const TITLE_WORDMARK_SOURCE = "/assets/title-wordmark-v2.png";
 const isAtlasArtId = (id: SushiArtId): id is AtlasArtId => id in atlasIndex;
+export function sushiSvgSource(id: string): string | undefined {
+  return PROVIDED_SUSHI_SVG_SOURCES[id as ProvidedSushiSvgId];
+}
 export function sushiLabel(id: SushiArtId) { return sushiWord(id)?.name ?? "寿司"; }
 export function sushiAtlasLayout(id: SushiArtId) {
   if (isAtlasArtId(id)) return { atlas: "original" as const, columns: 4, rows: 2, index: atlasIndex[id] };
+  if (id === "hotate" || id === "binchoumaguro") return undefined;
   return { atlas: "extra" as const, columns: 6, rows: 4, index: SUSHI_WORDS.findIndex(word => word.id === id) - 8 };
 }
 
@@ -47,17 +70,21 @@ export function loadSushiArt(onReady: () => void): { assets: SushiArtAssets; dis
   const atlas = new Image();
   const extraAtlas = new Image();
   const wordmark = new Image();
+  const svg = Object.fromEntries(Object.keys(PROVIDED_SUSHI_SVG_SOURCES).map(id => {
+    const image = new Image();
+    return [id, image];
+  })) as Record<ProvidedSushiSvgId, HTMLImageElement>;
+  const images = [atlas, extraAtlas, wordmark, ...Object.values(svg)];
   let active = true;
   const wake = () => { if (active) onReady(); };
-  atlas.addEventListener("load", wake);
-  extraAtlas.addEventListener("load", wake);
-  wordmark.addEventListener("load", wake);
+  for (const image of images) { image.addEventListener("load", wake); image.addEventListener("error", wake); }
   atlas.src = SUSHI_ATLAS_SOURCE;
   extraAtlas.src = SUSHI_EXTRA_ATLAS_SOURCE;
   wordmark.src = TITLE_WORDMARK_SOURCE;
+  for (const [id, source] of Object.entries(PROVIDED_SUSHI_SVG_SOURCES)) svg[id as ProvidedSushiSvgId].src = source;
   return {
-    assets: { atlas, extraAtlas, wordmark },
-    dispose() { active = false; atlas.removeEventListener("load", wake); extraAtlas.removeEventListener("load", wake); wordmark.removeEventListener("load", wake); },
+    assets: { atlas, extraAtlas, wordmark, svg },
+    dispose() { active = false; for (const image of images) { image.removeEventListener("load", wake); image.removeEventListener("error", wake); } },
   };
 }
 
@@ -116,11 +143,33 @@ function fallbackSushi(ctx: CanvasRenderingContext2D, id: SushiArtId, x: number,
   ctx.restore();
 }
 
+function drawable(image: HTMLImageElement | undefined): image is HTMLImageElement {
+  return !!image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+}
+
+/** Keep complete supplied SVG plates inside the legacy sprite envelope without stretching them. */
+export function sushiSvgDrawRect(image: Pick<HTMLImageElement, "naturalWidth" | "naturalHeight">, x: number, y: number, width: number) {
+  const maxHeight = width * .78;
+  const scale = Math.min(width / image.naturalWidth, maxHeight / image.naturalHeight);
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  return { x: x - drawWidth / 2, y: y - drawHeight / 2, width: drawWidth, height: drawHeight };
+}
+
 /** Draw one cell from the atlas without exposing neighboring cell pixels. */
 export function drawSushiPlate(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, id: SushiArtId, x: number, y: number, width: number, highlighted = false) {
+  const svg = sushiSvgSource(id);
+  const svgArt = svg ? assets?.svg?.[id as ProvidedSushiSvgId] : undefined;
+  if (drawable(svgArt)) {
+    const rect = sushiSvgDrawRect(svgArt, x, y, width);
+    if (highlighted) { ctx.save(); ctx.shadowColor = "rgba(112,35,22,.42)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8; }
+    ctx.drawImage(svgArt, rect.x, rect.y, rect.width, rect.height);
+    if (highlighted) ctx.restore();
+    return;
+  }
   const layout = sushiAtlasLayout(id);
-  const atlas = layout.atlas === "original" ? assets?.atlas : assets?.extraAtlas;
-  if (atlas?.complete && atlas.naturalWidth > 0) {
+  const atlas = layout?.atlas === "original" ? assets?.atlas : assets?.extraAtlas;
+  if (layout && drawable(atlas)) {
     const cellW = atlas.naturalWidth / layout.columns, cellH = atlas.naturalHeight / layout.rows, index = layout.index;
     const sourceX = (index % layout.columns) * cellW + 4, sourceY = Math.floor(index / layout.columns) * cellH + 4;
     const drawW = width, drawH = width * .72;

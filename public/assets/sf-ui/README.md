@@ -1,6 +1,6 @@
 # 2026 SF game UI reference assets
 
-These PNGs were cropped from `/Users/tah/Downloads/2026_SF_game-ui.ai` after rendering the 1920x1080 page. They are presentation assets only; score, timer, sushi name, romaji, letters, and skeletons remain live Canvas/UI data.
+The gameplay PNGs were cropped from `/Users/tah/Downloads/2026_SF_game-ui.ai`; ranking title/buttons were cropped from `/Users/tah/Downloads/2026_SF_ranking-UI.ai` after rendering their 1920x1080 pages. They are presentation assets only; score, player name, letters, and skeletons remain live Canvas/UI data.
 
 | Asset | Dimensions | Intended use |
 | --- | ---: | --- |
@@ -14,5 +14,7 @@ These PNGs were cropped from `/Users/tah/Downloads/2026_SF_game-ui.ai` after ren
 | `plate-stack.png` | 125x90 | Pixel plate-stack icon for the dish-count HUD; crop includes the cream HUD backing |
 | `pose-guide-panel.png` | 490x220 | Blank cream inner surface for the sample-pose panel |
 | `pose-camera-panel.png` | 745x220 | Blank gray inner surface for the current-pose panel |
+| `ranking-title.png` | 790x195 | Supplied ranking-reference title plaque with crown and wave ornaments; it contains no player data |
+| `ranking-back.png` / `ranking-refresh.png` | 250x90 each | Supplied static menu/refresh button art; transparent native controls provide the interactions |
 
 The original PDF embeds LINESeedJPApp OT ExtraBold/Bold and Jersey25-Regular. `fonts/LINESeedJP-ExtraBold.ttf`, `fonts/LINESeedJP-Regular.ttf`, and `fonts/Jersey25-Regular.ttf` are sourced from the Google Fonts repository under the OFL; their corresponding `*-OFL.txt` files are kept beside them. Use `@font-face` only for the pixel/reference UI; the existing fallback stack remains useful while the app shell loads.

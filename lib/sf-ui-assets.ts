@@ -1,5 +1,5 @@
 /** Presentation-only crops from the supplied Illustrator reference. */
-export type SfUiAssets = Partial<Record<"topWood" | "counterWood" | "lanternLeft" | "lanternRight" | "conveyor" | "wave" | "maguro" | "hourglass" | "plateStack" | "poseGuide" | "poseCamera", HTMLImageElement>>;
+export type SfUiAssets = Partial<Record<"topWood" | "counterWood" | "lanternLeft" | "lanternRight" | "conveyor" | "wave" | "maguro" | "hourglass" | "plateStack" | "poseGuide" | "poseCamera" | "rankingTitle" | "rankingBack" | "rankingRefresh", HTMLImageElement>>;
 
 const sources = {
   topWood: "/assets/sf-ui/top-wood.png", counterWood: "/assets/sf-ui/counter-wood.png",
@@ -7,6 +7,7 @@ const sources = {
   conveyor: "/assets/sf-ui/conveyor-strip.png", wave: "/assets/sf-ui/wave-corner.png",
   maguro: "/assets/sf-ui/sushi-maguro.png", hourglass: "/assets/sf-ui/hourglass.png",
   plateStack: "/assets/sf-ui/plate-stack.png", poseGuide: "/assets/sf-ui/pose-guide-panel.png", poseCamera: "/assets/sf-ui/pose-camera-panel.png",
+  rankingTitle: "/assets/sf-ui/ranking-title.png", rankingBack: "/assets/sf-ui/ranking-back.png", rankingRefresh: "/assets/sf-ui/ranking-refresh.png",
 } as const;
 
 export function loadSfUiAssets(onReady: () => void): { assets: SfUiAssets; dispose(): void } {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GAME_HEIGHT, GAME_WIDTH, type Rect, canvasBackingRect, containVideo, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, hudSnapshotKey, portraitGameRects, rectsOverlap, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
+import { GAME_HEIGHT, GAME_WIDTH, type Rect, canvasBackingRect, containVideo, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, hudSnapshotKey, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, rectsOverlap, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
 import { POSE_TEMPLATES } from "./pose";
 import { SUSHI_WORDS } from "./sushi-words";
 
@@ -160,6 +160,48 @@ describe("game canvas layout", () => {
     expect(desktopScene.letters.height).toBeGreaterThanOrEqual(126);
   });
 
+  it("keeps ranking navigation in the visual controls and touch-sized in portrait", () => {
+    const rankingRects = ["rankingPrevious", "rankingPage1", "rankingPage2", "rankingPage3", "rankingPage4", "rankingNext"] as const;
+    for (const key of rankingRects) {
+      const desktop = gameRects[key], portrait = portraitGameRects[key], rendered = cssRect(portrait, fitGameViewport(390, 844));
+      expect(desktop.x).toBeGreaterThanOrEqual(0); expect(desktop.y).toBeGreaterThanOrEqual(0);
+      expect(desktop.x + desktop.width).toBeLessThanOrEqual(GAME_WIDTH); expect(desktop.y + desktop.height).toBeLessThanOrEqual(GAME_HEIGHT);
+      expect(rendered.width).toBeGreaterThanOrEqual(44); expect(rendered.height).toBeGreaterThanOrEqual(44);
+      expect(rendered.left + rendered.width).toBeLessThanOrEqual(390);
+    }
+    for (const width of [390, 320]) {
+      const viewport = fitGameViewport(width, 850, true), pager = [portraitGameRects.rankingPrevious, portraitGameRects.rankingPage1, portraitGameRects.rankingPage2, portraitGameRects.rankingPage3, portraitGameRects.rankingPage4, portraitGameRects.rankingNext].map(rect => cssRect(rect, viewport));
+      expect(pager.every(rect => rect.width >= 44 && rect.height >= 44)).toBe(true);
+      expect((pager[0]!.left + pager.at(-1)!.left + pager.at(-1)!.width) / 2).toBeCloseTo(width / 2);
+    }
+    expect(rectsOverlap(gameRects.rankingBack, gameRects.rankingPage1)).toBe(false);
+    expect(rectsOverlap(gameRects.rankingRefresh, gameRects.rankingPage4)).toBe(false);
+  });
+
+  it("keeps ranking headers, rows, and crown art inside the stepped board geometry", () => {
+    for (const portrait of [false, true]) {
+      const { inner, table, headerY, columns } = rankingCanvasGeometry(portrait), headerTop = headerY - (portrait ? 9 : 11), headerBottom = headerY + (portrait ? 9 : 11);
+      expect(headerTop).toBeGreaterThanOrEqual(inner.y + 6); expect(headerBottom).toBeLessThanOrEqual(inner.y + inner.height - 6);
+      expect(columns.name.x).toBeGreaterThanOrEqual(table.x); expect(columns.name.x + columns.name.width).toBeLessThanOrEqual(columns.score.x); expect(columns.score.x + columns.score.width).toBeLessThanOrEqual(table.x + table.width);
+      expect(columns.rankCenter).toBeLessThan(columns.name.x);
+      for (let index = 0; index < 10; index++) {
+        const row = { x:table.x, y:table.y + index * table.row, width:table.width, height:table.row - 2 }, crown = rankingCrownRect(row, portrait);
+        expect(row.y).toBeGreaterThanOrEqual(inner.y); expect(row.y + row.height).toBeLessThanOrEqual(inner.y + inner.height - 6);
+        expect(crown.y).toBeGreaterThanOrEqual(row.y); expect(crown.y + crown.height).toBeLessThanOrEqual(row.y + row.height);
+      }
+    }
+  });
+
+  it("fits 20-character names and seven-digit scores within their ranking cells", () => {
+    for (const portrait of [false, true]) {
+      const { columns } = rankingCanvasGeometry(portrait);
+      const nameSize = fittedTextSize(size => 20 * size * .88, portrait ? 17 : 23, 12, columns.name.width);
+      const scoreSize = fittedTextSize(size => 7 * size * .72, portrait ? 18 : 30, portrait ? 13 : 20, columns.score.width);
+      expect(20 * nameSize * .88).toBeLessThanOrEqual(columns.name.width);
+      expect(7 * scoreSize * .72).toBeLessThanOrEqual(columns.score.width);
+    }
+  });
+
   it("fits every dish label and letter row into its reserved ticket and lane regions", () => {
     const ticket = ticketTextSlot();
     for (const word of SUSHI_WORDS) {
@@ -172,6 +214,22 @@ describe("game canvas layout", () => {
       expect(tiles.width).toBeLessThanOrEqual(desktopScene.letters.width);
       expect(tiles.size).toBeGreaterThan(0);
     }
+  });
+
+  it("contains the 13-letter BINCHOUMAGURO ticket and tile row in portrait", () => {
+    const word = SUSHI_WORDS.find(candidate => candidate.id === "binchoumaguro")!;
+    const ticket = ticketTextSlot({ x: 68, y: 154, width: 464, height: 134 });
+    const romaji = word.romaji.split("").join(" ");
+    const romajiSize = fittedTextSize(size => Array.from(romaji).length * size * .7, 14, 10, ticket.width);
+    const nameSize = fittedTextSize(size => Array.from(word.name).length * size * .92, 34, 22, ticket.width);
+    const tiles = wordTileLayout(word.romaji.length, 488, true);
+    expect(word.romaji).toBe("BINCHOUMAGURO");
+    expect(Array.from(word.romaji)).toHaveLength(13);
+    expect(Array.from(word.name)).toHaveLength(8);
+    expect(Array.from(romaji).length * romajiSize * .7).toBeLessThanOrEqual(ticket.width);
+    expect(Array.from(word.name).length * nameSize * .92).toBeLessThanOrEqual(ticket.width);
+    expect(tiles.width).toBeLessThanOrEqual(488);
+    expect(tiles.size).toBeGreaterThan(0);
   });
 
   it("keeps the whole-dish skip control touch-sized in the portrait game", () => {

@@ -22,11 +22,13 @@ describe("pose matcher",()=>{
  it("keeps every limb in a plausible standing range and preserves key letter silhouettes",()=>{
   for(const template of POSE_TEMPLATES) for(const [start,end] of [["leftShoulder","leftElbow"],["leftElbow","leftWrist"],["rightShoulder","rightElbow"],["rightElbow","rightWrist"],["leftHip","leftKnee"],["leftKnee","leftAnkle"],["rightHip","rightKnee"],["rightKnee","rightAnkle"]] as const) { const length=distance(template.pose[start],template.pose[end]);expect(length,`${template.id}:${start}-${end}`).toBeGreaterThan(.5);expect(length,`${template.id}:${start}-${end}`).toBeLessThan(1.5); }
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
-  const A=byId("A").pose,M=byId("M").pose,O=byId("O").pose,U=byId("U").pose;
+  const A=byId("A").pose,C=byId("C").pose,H=byId("H").pose,M=byId("M").pose,O=byId("O").pose,U=byId("U").pose;
   expect(distance(A.leftWrist,A.rightWrist)).toBeLessThan(.3);expect(Math.abs(A.leftAnkle.x-A.rightAnkle.x)).toBeGreaterThan(2);
   expect(M.leftWrist.y).toBeGreaterThan(M.leftElbow.y);expect(M.rightWrist.y).toBeGreaterThan(M.rightElbow.y);
   expect(distance(O.leftWrist,O.rightWrist)).toBeLessThan(.3);expect(Math.abs(O.leftElbow.x-O.rightElbow.x)).toBeGreaterThan(2);
   expect(U.leftWrist.y).toBeLessThan(U.leftElbow.y);expect(U.rightWrist.y).toBeLessThan(U.rightElbow.y);
+  expect(C.leftWrist.y).toBeLessThan(C.leftElbow.y);expect(C.rightWrist.y).toBeGreaterThan(C.rightElbow.y);
+  expect(H.leftWrist.y).toBeGreaterThan(H.leftElbow.y);expect(H.rightWrist.y).toBeGreaterThan(H.rightElbow.y);expect(Math.abs(H.leftAnkle.x-H.rightAnkle.x)).toBeGreaterThan(1.5);
  });
  it("keeps every adopted character pose distinct at the play threshold",()=>{for(const actual of POSE_TEMPLATES)for(const target of POSE_TEMPLATES)if(actual.id!==target.id)expect(matchPose(syntheticLandmarks(actual,16/9),16/9,target).accuracy,`${actual.character} must not solve ${target.character}`).toBeLessThan(DEFAULT_CONFIG.threshold);});
  it("maps raw front-facing anatomical sides into canonical mirrored-viewer scoring coordinates",()=>{
@@ -48,8 +50,10 @@ describe("sushi word catalog",()=>{
  it("contains the canonical dishes, alphabet, and a deterministic balanced deck",()=>{
   expect(SUSHI_WORDS.find(word=>word.id==="maguro")).toEqual({id:"maguro",name:"まぐろ",romaji:"MAGURO"});
   expect(new Set(SUSHI_WORDS.flatMap(word=>[...word.romaji]))).toEqual(new Set(ROMAJI_ALPHABET));
-  const deck=wordSequence(42,32);expect(deck).toEqual(wordSequence(42,32));expect(new Set(deck).size).toBe(32);
-  const next=wordSequence(42,33);expect(next[31]).not.toBe(next[32]);
+  expect(SUSHI_WORDS.find(word=>word.id==="hotate")).toEqual({id:"hotate",name:"ほたて",romaji:"HOTATE"});
+  expect(SUSHI_WORDS.find(word=>word.id==="binchoumaguro")).toEqual({id:"binchoumaguro",name:"びんちょうまぐろ",romaji:"BINCHOUMAGURO"});
+  const deck=wordSequence(42,34);expect(deck).toEqual(wordSequence(42,34));expect(new Set(deck).size).toBe(34);
+  const next=wordSequence(42,35);expect(next[33]).not.toBe(next[34]);
  });
 });
 describe("game engine",()=>{

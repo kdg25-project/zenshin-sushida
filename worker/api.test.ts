@@ -89,4 +89,23 @@ describe("D1 ranking API", () => {
       expect(body.rulesKey).toBe(RULES_KEY);expect(body.entries).toHaveLength(3);
     } finally { await mf.dispose(); }
   });
+
+  it("returns the current rule's ordered top 40 records for ranking pages", async () => {
+    const mf = await worker();
+    try {
+      await mf.dispatchFetch("http://local.test/__test/setup");
+      const db = await mf.getD1Database("DB");
+      for (let index = 0; index < 42; index++) {
+        const sessionId = `rank-${index}`;
+        await db.prepare("INSERT INTO game_sessions (id,token_hash,rules_key,started_at,simulation,target_seed) VALUES (?,?,?,?,?,?)").bind(sessionId, "hash", RULES_KEY, index, 0, 1).run();
+        await db.prepare("INSERT INTO leaderboard_entries (rules_key,session_id,player_name,score,solved,max_combo,average_accuracy,created_at) VALUES (?,?,?,?,?,?,?,?)").bind(RULES_KEY, sessionId, `player-${index}`, 1000 - index, index % 9, index % 5, 9000, index).run();
+      }
+      await db.prepare("INSERT INTO game_sessions (id,token_hash,rules_key,started_at,simulation,target_seed) VALUES (?,?,?,?,?,?)").bind("old-rank", "hash", "old-rules", 1, 0, 1).run();
+      await db.prepare("INSERT INTO leaderboard_entries (rules_key,session_id,player_name,score,solved,max_combo,average_accuracy,created_at) VALUES (?,?,?,?,?,?,?,?)").bind("old-rules", "old-rank", "old-player", 999999, 99, 99, 9999, 0).run();
+      const response = await mf.dispatchFetch("http://local.test/api/leaderboard");
+      const body = await response.json() as { rulesKey: string; entries: Array<{ playerName: string; score: number }> };
+      expect(response.status).toBe(200); expect(body.rulesKey).toBe(RULES_KEY); expect(body.entries).toHaveLength(40);
+      expect(body.entries[0]).toMatchObject({ playerName: "player-0", score: 1000 }); expect(body.entries.at(-1)).toMatchObject({ playerName: "player-39", score: 961 });
+    } finally { await mf.dispose(); }
+  });
 });

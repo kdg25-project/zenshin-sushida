@@ -43,7 +43,7 @@ function validateEvents(value:unknown, seed:number): ReplayResult|undefined {
 async function api(request:Request, env:Env){
   const url=new URL(request.url);
   if(url.pathname==="/api/leaderboard"&&request.method==="GET"){
-    const rows=await env.DB.prepare("SELECT player_name as playerName, score, solved, max_combo as maxCombo, average_accuracy as averageAccuracy, created_at as createdAt FROM leaderboard_entries WHERE rules_key=? ORDER BY score DESC, solved DESC, max_combo DESC, created_at ASC, id ASC LIMIT 10").bind(RULES_KEY).all();
+    const rows=await env.DB.prepare("SELECT player_name as playerName, score, solved, max_combo as maxCombo, average_accuracy as averageAccuracy, created_at as createdAt FROM leaderboard_entries WHERE rules_key=? ORDER BY score DESC, solved DESC, max_combo DESC, created_at ASC, id ASC LIMIT 40").bind(RULES_KEY).all();
     return json({rulesKey:RULES_KEY,entries:rows.results});
   }
   if(url.pathname==="/api/games"&&request.method==="POST"){

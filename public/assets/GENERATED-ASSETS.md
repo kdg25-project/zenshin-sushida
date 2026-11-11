@@ -2,6 +2,14 @@
 
 Generated with the built-in `image_gen` tool for this project. Both images retain transparent RGBA backgrounds. These are original game assets, not assets copied from another game.
 
+## Supplied pixel-art sushi SVGs
+
+The following source files were supplied for this project and are retained byte-for-byte in `public/assets/sushi-svg/`. They are selected only by the exact playable dish ID/romaji filename; they already include their own blue-rimmed plate, so the Canvas renderer does not add a second plate.
+
+- `AKAGAI.svg`, `BINCHOUMAGURO.svg`, `EBI.svg`, `HOTATE.svg`, `IKURA.svg`, `NEGITORO.svg`, `SABA.svg`, `TAKO.svg`, and `UNI.svg`: preferred artwork for the matching `akagai`, `binchoumaguro`, `ebi`, `hotate`, `ikura`, `negitoro`, `saba`, `tako`, and `uni` dishes. HOTATE is now a playable `ほたて` dish and begins with the H pose; BINCHOUMAGURO is a playable `びんちょうまぐろ` dish and includes the C pose.
+
+The 320 × 240 files and the taller 320 × 300 IKURA/UNI files are drawn with aspect-ratio-preserving contain sizing inside the established sprite envelope. Pending or failed SVG loads retain the existing PNG-atlas and vector fallbacks.
+
 ## Saved assets
 
 - `public/assets/sushi-atlas-v2.png`: 1774 x 887, four columns by two rows. MAGURO, TAMAGO, EBI, IKA / IKURA, UNI, TAKO, SABA.

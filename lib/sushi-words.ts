@@ -32,6 +32,8 @@ export const SUSHI_WORDS = [
   { id: "aburimaguro", name: "炙りまぐろ", romaji: "ABURIMAGURO" },
   { id: "ootoro", name: "大とろ", romaji: "OOTORO" },
   { id: "negitoro", name: "ねぎとろ", romaji: "NEGITORO" },
+  { id: "hotate", name: "ほたて", romaji: "HOTATE" },
+  { id: "binchoumaguro", name: "びんちょうまぐろ", romaji: "BINCHOUMAGURO" },
 ] as const;
 
 export type SushiWordId = (typeof SUSHI_WORDS)[number]["id"];
@@ -39,7 +41,7 @@ export type SushiWord = (typeof SUSHI_WORDS)[number];
 
 export type SushiWordProgress = { word: SushiWord; wordIndex: number; letterIndex: number };
 
-export const ROMAJI_ALPHABET = ["A", "B", "E", "G", "I", "K", "M", "N", "O", "R", "S", "T", "U"] as const;
+export const ROMAJI_ALPHABET = ["A", "B", "C", "E", "G", "H", "I", "K", "M", "N", "O", "R", "S", "T", "U"] as const;
 export type RomajiLetter = (typeof ROMAJI_ALPHABET)[number];
 
 const wordById = new Map<SushiWordId, SushiWord>(SUSHI_WORDS.map(word => [word.id, word]));

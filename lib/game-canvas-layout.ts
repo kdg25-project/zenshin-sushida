@@ -43,9 +43,15 @@ export const gameRects = {
   resultRegister: { x: 390, y: 505, width: 420, height: 42 },
   resultRetry: { x: 390, y: 558, width: 202, height: 40 },
   resultMenu: { x: 608, y: 558, width: 202, height: 40 },
-  rankingBack: { x: 70, y: 610, width: 210, height: 40 },
-  rankingRefresh: { x: 900, y: 610, width: 220, height: 40 },
+  rankingBack: { x: 141, y: 600, width: 156, height: 56 },
+  rankingRefresh: { x: 905, y: 600, width: 156, height: 56 },
   rankingRetry: { x: 440, y: 510, width: 320, height: 40 },
+  rankingPrevious: { x: 438, y: 568, width: 44, height: 42 },
+  rankingPage1: { x: 488, y: 568, width: 44, height: 42 },
+  rankingPage2: { x: 538, y: 568, width: 44, height: 42 },
+  rankingPage3: { x: 588, y: 568, width: 44, height: 42 },
+  rankingPage4: { x: 638, y: 568, width: 44, height: 42 },
+  rankingNext: { x: 688, y: 568, width: 44, height: 42 },
   camera: desktopScene.calibrationCamera,
   target: desktopScene.calibrationGuide,
   world: { x: 205, y: 88, width: 790, height: 226 },
@@ -69,6 +75,12 @@ export const compactGameRects = {
   rankingBack: { x: 70, y: 660, width: 420, height: 105 },
   rankingRefresh: { x: 710, y: 660, width: 420, height: 105 },
   rankingRetry: { x: 180, y: 530, width: 840, height: 105 },
+  rankingPrevious: { x: 430, y: 810, width: 84, height: 105 },
+  rankingPage1: { x: 530, y: 810, width: 84, height: 105 },
+  rankingPage2: { x: 630, y: 810, width: 84, height: 105 },
+  rankingPage3: { x: 730, y: 810, width: 84, height: 105 },
+  rankingPage4: { x: 830, y: 810, width: 84, height: 105 },
+  rankingNext: { x: 930, y: 810, width: 84, height: 105 },
 } as const satisfies Record<keyof typeof gameRects, Rect>;
 
 export const PORTRAIT_WIDTH = 600;
@@ -88,10 +100,27 @@ export const portraitGameRects = {
   resultRegister: { x: 55, y: 680, width: 490, height: 80 },
   resultRetry: { x: 55, y: 790, width: 230, height: 80 },
   resultMenu: { x: 315, y: 790, width: 230, height: 80 },
-  rankingBack: { x: 45, y: 890, width: 235, height: 76 },
-  rankingRefresh: { x: 320, y: 890, width: 235, height: 76 },
+  rankingBack: { x: 28, y: 900, width: 244, height: 88 },
+  rankingRefresh: { x: 328, y: 900, width: 244, height: 88 },
   rankingRetry: { x: 55, y: 700, width: 490, height: 80 },
+  rankingPrevious: { x: 16, y: 790, width: 88, height: 88 },
+  rankingPage1: { x: 112, y: 790, width: 88, height: 88 },
+  rankingPage2: { x: 208, y: 790, width: 88, height: 88 },
+  rankingPage3: { x: 304, y: 790, width: 88, height: 88 },
+  rankingPage4: { x: 400, y: 790, width: 88, height: 88 },
+  rankingNext: { x: 496, y: 790, width: 88, height: 88 },
 } as const satisfies Record<keyof typeof gameRects, Rect>;
+
+/** Ranking paint and interaction geometry stay in one place so the reference board cannot drift. */
+export function rankingCanvasGeometry(portrait: boolean) {
+  const card = portrait ? { x:20, y:148, width:560, height:626 } : { x:142, y:118, width:916, height:476 };
+  const inner = portrait ? { x:47, y:174, width:506, height:574 } : { x:169, y:144, width:862, height:424 };
+  const table = portrait ? { x:38, y:225, width:524, row:44 } : { x:194, y:182, width:812, row:38 };
+  return { card, inner, table, headerY: portrait ? 190 : 162, columns: portrait ? { rankCenter:90, name:{ x:143, width:260 }, score:{ x:421, width:116 } } : { rankCenter:289, name:{ x:505, width:280 }, score:{ x:805, width:150 } } };
+}
+
+/** The medal silhouette is intentionally bounded by one table row at every viewport size. */
+export function rankingCrownRect(row: Rect, portrait: boolean): Rect { return { x: row.x + (portrait ? 32 : 77), y: row.y + (row.height - 32) / 2, width:36, height:32 }; }
 
 export function fitGameViewport(width: number, height: number, compact = gameLayoutModeForWidth(width) === "portrait") {
   const logicalWidth = compact ? PORTRAIT_WIDTH : GAME_WIDTH, logicalHeight = compact ? PORTRAIT_HEIGHT : GAME_HEIGHT;
