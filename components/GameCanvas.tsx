@@ -192,7 +192,7 @@ function drawMenu(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefi
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH;
   const sign = portrait ? { x:55,y:58,width:490,height:130 } : { x:282,y:34,width:636,height:150 };
   pixelFrame(ctx,sign,"#fde0b4","#ea241b",10);ctx.fillStyle="#bf180f";ctx.fillRect(sign.x+18,sign.y+18,sign.width*.28,sign.height-36);
-  drawSushiPlate(ctx,assets,"ebi",sign.x+sign.width*.16,sign.y+sign.height*.54,portrait?138:176,true);
+  drawSushiPlate(ctx,assets,"maguro",sign.x+sign.width*.16,sign.y+sign.height*.54,portrait?138:176,true);
   text(ctx,"全身寿司打",sign.x+sign.width*.67,sign.y+sign.height*.46,portrait?40:56,"#08090b","center",pixelFont);
   text(ctx,"からだで にぎる 60秒",sign.x+sign.width*.67,sign.y+sign.height*.76,portrait?15:20,"#8b6244","center",pixelFont);
   text(ctx, "ランキング名（デモは空欄でもOK）", rects.name.x, rects.name.y - 25, portrait ? 20 : 17, "#fff5d8");
@@ -283,7 +283,7 @@ function rankingBoard(ctx: CanvasRenderingContext2D, rect: Rect, inner: Rect) {
 function drawRankingBackdrop(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, width: number, height: number, portrait: boolean) {
   const beltBottom = portrait ? 145 : 135, navyBottom = portrait ? 804 : 536;
   ctx.fillStyle = "#172a3a"; ctx.fillRect(0, 20, width, beltBottom - 20);
-  const beltDishes = ["ebi", "tako", "hotate", "uni"] as const;
+  const beltDishes = ["maguro", "tekka", "hotate", "uni"] as const;
   for (let x = -18, index = 0; x < width + 90; x += portrait ? 124 : 152, index++) { ctx.fillStyle = "#22354a"; ctx.fillRect(x, 28, portrait ? 108 : 136, beltBottom - 34); ctx.strokeStyle = "#0b1016"; ctx.lineWidth = 3; ctx.strokeRect(x, 28, portrait ? 108 : 136, beltBottom - 34); drawSushiPlate(ctx, assets, beltDishes[index % beltDishes.length]!, x + (portrait ? 53 : 68), 73, portrait ? 62 : 78); }
   if (!portrait) { drawLantern(ctx, 46, 82); drawLantern(ctx, width - 46, 82, true); }
   ctx.fillStyle = "#172a3a"; ctx.fillRect(0, beltBottom, width, navyBottom - beltBottom); drawCornerWave(ctx, portrait ? 25 : 55, navyBottom - 96); drawCornerWave(ctx, portrait ? width - 25 : width - 55, navyBottom - 96, true);

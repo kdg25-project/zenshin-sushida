@@ -9,6 +9,8 @@ export const SUSHI_WORDS = [
   { id: "negitoro", name: "ねぎとろ", romaji: "NEGITORO" },
   { id: "hotate", name: "ほたて", romaji: "HOTATE" },
   { id: "binchoumaguro", name: "びんちょうまぐろ", romaji: "BINCHOUMAGURO" },
+  { id: "maguro", name: "まぐろ", romaji: "MAGURO" },
+  { id: "tekka", name: "鉄火巻き", romaji: "TEKKAMAKI" },
 ] as const;
 
 export type SushiWordId = (typeof SUSHI_WORDS)[number]["id"];

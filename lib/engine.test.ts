@@ -48,12 +48,14 @@ describe("pose matcher",()=>{
 });
 describe("sushi word catalog",()=>{
  it("contains the canonical dishes, alphabet, and a deterministic balanced deck",()=>{
-  expect(SUSHI_WORDS.map(word=>word.id)).toEqual(["ebi","ikura","uni","tako","saba","akagai","negitoro","hotate","binchoumaguro"]);
+  expect(SUSHI_WORDS.map(word=>word.id)).toEqual(["ebi","ikura","uni","tako","saba","akagai","negitoro","hotate","binchoumaguro","maguro","tekka"]);
   expect(new Set(SUSHI_WORDS.flatMap(word=>[...word.romaji]))).toEqual(new Set(ROMAJI_ALPHABET));
   expect(SUSHI_WORDS.find(word=>word.id==="hotate")).toEqual({id:"hotate",name:"ほたて",romaji:"HOTATE"});
   expect(SUSHI_WORDS.find(word=>word.id==="binchoumaguro")).toEqual({id:"binchoumaguro",name:"びんちょうまぐろ",romaji:"BINCHOUMAGURO"});
-  const deck=wordSequence(42,9);expect(deck).toEqual(wordSequence(42,9));expect(new Set(deck).size).toBe(9);
-  const next=wordSequence(42,10);expect(next[8]).not.toBe(next[9]);
+  expect(SUSHI_WORDS.find(word=>word.id==="maguro")).toEqual({id:"maguro",name:"まぐろ",romaji:"MAGURO"});
+  expect(SUSHI_WORDS.find(word=>word.id==="tekka")).toEqual({id:"tekka",name:"鉄火巻き",romaji:"TEKKAMAKI"});
+  const deck=wordSequence(42,11);expect(deck).toEqual(wordSequence(42,11));expect(new Set(deck).size).toBe(11);
+  const next=wordSequence(42,12);expect(next[10]).not.toBe(next[11]);
  });
 });
 describe("game engine",()=>{

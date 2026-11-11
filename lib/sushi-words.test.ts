@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
@@ -7,8 +8,19 @@ import { drawSushiPlate, loadSushiArt, PROVIDED_SUSHI_SVG_SOURCES, SUSHI_ART_IDS
 import { RULES_KEY } from "./game-rules";
 import { ROMAJI_ALPHABET, SUSHI_WORDS, sushiWord, wordSequence } from "./sushi-words";
 
-const CATALOG_IDS = ["ebi", "ikura", "uni", "tako", "saba", "akagai", "negitoro", "hotate", "binchoumaguro"];
-const ASSET_IDS = ["akagai", "binchoumaguro", "ebi", "hotate", "ikura", "negitoro", "saba", "tako", "uni"];
+const CATALOG_IDS = ["ebi", "ikura", "uni", "tako", "saba", "akagai", "negitoro", "hotate", "binchoumaguro", "maguro", "tekka"];
+const ASSET_IDS = ["akagai", "binchoumaguro", "ebi", "hotate", "ikura", "maguro", "negitoro", "saba", "tako", "tekka", "uni"];
+const LEGACY_PNG_SHA256 = {
+  akagai: "61800a9ba171fceb0097c3a0f70c3f7859764a6c973afd5d22c6517f40ae76e4",
+  binchoumaguro: "9984b50b14b990501953f0e0367ac4e95eb7dd323c17fe025769df9371185b0b",
+  ebi: "f657065461fc37058c123f6afc7a8c3c71ed6b9caaf8d8fc4c90cffe7510df09",
+  hotate: "580fb64a29d3e83c1ec4b3353580a2efcc9a89f5478a1618814fdd07a464acd2",
+  ikura: "a9618efb4da1b9df608324b7100cd55ff99e452262b6b094674e331037fda130",
+  negitoro: "7278ef2cb6380ce8a93ff686853c2eda87b9c3017ae4d2bee081ddbc426632eb",
+  saba: "8cfc3311fe19b9680b6c622167b30e2a5367f84b157c0987de8fc627ab88dc25",
+  tako: "88f1d82db0a706c9150133ed51d0303bed267e1e489ef40054dd8f458256ba49",
+  uni: "a942d36b05f24e16561bc8267bc0a531bd27d2ca5913503d07755def56a0d4aa",
+} as const;
 
 function rgbaPixels(source: Buffer) {
   let offset = 8, width = 0, height = 0;
@@ -29,7 +41,7 @@ function rgbaPixels(source: Buffer) {
 }
 
 describe("sushi dish deck", () => {
-  it("contains exactly the nine supplied dishes with playable romaji and matching artwork", () => {
+  it("contains exactly the eleven supplied dishes with playable romaji and matching artwork", () => {
     expect(SUSHI_WORDS.map(word => word.id)).toEqual(CATALOG_IDS);
     expect(new Set(SUSHI_WORDS.map(word => word.name)).size).toBe(SUSHI_WORDS.length);
     const playable = new Set(POSE_TEMPLATES.map(template => template.id));
@@ -41,21 +53,23 @@ describe("sushi dish deck", () => {
     }
     expect(SUSHI_ART_IDS).toEqual(CATALOG_IDS);
     expect(Object.keys(SUSHI_PIXEL_SOURCES)).toEqual(ASSET_IDS);
-    expect(RULES_KEY).toContain("|words-v4|");
+    expect(RULES_KEY).toContain("|words-v5|");
   });
 
   it("uses only the supplied SVGs as provenance and normalized pixels at runtime", () => {
     expect(PROVIDED_SUSHI_SVG_SOURCES).toEqual({
       akagai: "/assets/sushi-svg/AKAGAI.svg", binchoumaguro: "/assets/sushi-svg/BINCHOUMAGURO.svg", ebi: "/assets/sushi-svg/EBI.svg",
-      hotate: "/assets/sushi-svg/HOTATE.svg", ikura: "/assets/sushi-svg/IKURA.svg", negitoro: "/assets/sushi-svg/NEGITORO.svg",
-      saba: "/assets/sushi-svg/SABA.svg", tako: "/assets/sushi-svg/TAKO.svg", uni: "/assets/sushi-svg/UNI.svg",
+      hotate: "/assets/sushi-svg/HOTATE.svg", ikura: "/assets/sushi-svg/IKURA.svg", maguro: "/assets/sushi-svg/MAGURO.svg",
+      negitoro: "/assets/sushi-svg/NEGITORO.svg", saba: "/assets/sushi-svg/SABA.svg", tako: "/assets/sushi-svg/TAKO.svg",
+      tekka: "/assets/sushi-svg/TEKKAMAKI.svg", uni: "/assets/sushi-svg/UNI.svg",
     });
     for (const id of ASSET_IDS) {
-      expect(sushiSvgSource(id)).toContain(`/sushi-svg/${id === "binchoumaguro" ? "BINCHOUMAGURO" : id.toUpperCase()}.svg`);
+      const sourceStem = id === "binchoumaguro" ? "BINCHOUMAGURO" : id === "tekka" ? "TEKKAMAKI" : id.toUpperCase();
+      expect(sushiSvgSource(id)).toContain(`/sushi-svg/${sourceStem}.svg`);
       expect(sushiPixelSource(id)).toBe(`/assets/sushi-pixel/${id}.png`);
     }
-    expect(sushiSvgSource("maguro")).toBeUndefined();
-    expect(sushiPixelSource("maguro")).toBeUndefined();
+    expect(sushiSvgSource("unknown")).toBeUndefined();
+    expect(sushiPixelSource("unknown")).toBeUndefined();
   });
 
   it("draws the normalized pixels with smoothing disabled and no substitute artwork", () => {
@@ -92,17 +106,27 @@ describe("sushi dish deck", () => {
     } finally { vi.unstubAllGlobals(); }
   });
 
-  it("keeps every supplied SVG reproducible as a crisp 32px-grid PNG", () => {
+  it("keeps every supplied SVG reproducible without changing the legacy sprites", () => {
     execFileSync(process.execPath, ["scripts/generate-sushi-pixel-assets.mjs", "--check"], { cwd: process.cwd(), stdio: "pipe" });
-    const manifest = JSON.parse(readFileSync("public/assets/sushi-pixel/manifest.json", "utf8")) as Record<string, { width: number; height: number; sourceSha256: string }>;
+    const manifest = JSON.parse(readFileSync("public/assets/sushi-pixel/manifest.json", "utf8")) as Record<string, { width: number; height: number; sourceSha256: string; mode: string }>;
     expect(Object.keys(manifest)).toEqual(ASSET_IDS);
     for (const id of ASSET_IDS) {
       const image = rgbaPixels(readFileSync(`public/assets/sushi-pixel/${id}.png`));
-      expect(image.width).toBe(32);
-      expect(image.height).toBe(["ikura", "negitoro", "uni"].includes(id) ? 30 : 24);
+      expect(image.width).toBe(id === "tekka" ? 320 : 32);
+      expect(image.height).toBe(id === "tekka" ? 240 : ["ikura", "negitoro", "uni"].includes(id) ? 30 : 24);
       expect(manifest[id]?.sourceSha256).toMatch(/^[a-f\d]{64}$/);
+      expect(manifest[id]?.mode).toBe(id === "tekka" ? "native-no-export-grid" : "grid");
       for (let offset = 3; offset < image.rgba.length; offset += 4) expect([0, 255]).toContain(image.rgba[offset]);
+      if (id in LEGACY_PNG_SHA256) expect(createHash("sha256").update(readFileSync(`public/assets/sushi-pixel/${id}.png`)).digest("hex")).toBe(LEGACY_PNG_SHA256[id as keyof typeof LEGACY_PNG_SHA256]);
     }
+
+    const tekka = rgbaPixels(readFileSync("public/assets/sushi-pixel/tekka.png"));
+    for (const [x, y] of [[0, 0], [tekka.width - 1, 0], [0, tekka.height - 1], [tekka.width - 1, tekka.height - 1]]) expect(tekka.rgba[(y * tekka.width + x) * 4 + 3]).toBe(0);
+    const colors = new Map<string, number>();
+    for (let offset = 0; offset < tekka.rgba.length; offset += 4) { const color = [...tekka.rgba.subarray(offset, offset + 4)].join(","); colors.set(color, (colors.get(color) ?? 0) + 1); }
+    expect(colors.get("92,119,189,255")).toBeGreaterThan(0); // retained blue plate
+    expect(colors.get("0,0,0,255")).toBeGreaterThan(0); // default fill for stroke-only cls-2
+    expect(colors.get("204,204,204,255") ?? 0).toBe(0); // removed export grid, not foreground gray
   }, 15_000);
 
   it("deals every supplied dish once before repeating for each deterministic seed", () => {

@@ -8,9 +8,11 @@ export const PROVIDED_SUSHI_SVG_SOURCES = {
   ebi: "/assets/sushi-svg/EBI.svg",
   hotate: "/assets/sushi-svg/HOTATE.svg",
   ikura: "/assets/sushi-svg/IKURA.svg",
+  maguro: "/assets/sushi-svg/MAGURO.svg",
   negitoro: "/assets/sushi-svg/NEGITORO.svg",
   saba: "/assets/sushi-svg/SABA.svg",
   tako: "/assets/sushi-svg/TAKO.svg",
+  tekka: "/assets/sushi-svg/TEKKAMAKI.svg",
   uni: "/assets/sushi-svg/UNI.svg",
 } as const;
 
@@ -20,9 +22,11 @@ export const SUSHI_PIXEL_SOURCES = {
   ebi: "/assets/sushi-pixel/ebi.png",
   hotate: "/assets/sushi-pixel/hotate.png",
   ikura: "/assets/sushi-pixel/ikura.png",
+  maguro: "/assets/sushi-pixel/maguro.png",
   negitoro: "/assets/sushi-pixel/negitoro.png",
   saba: "/assets/sushi-pixel/saba.png",
   tako: "/assets/sushi-pixel/tako.png",
+  tekka: "/assets/sushi-pixel/tekka.png",
   uni: "/assets/sushi-pixel/uni.png",
 } as const;
 
@@ -98,7 +102,7 @@ export function drawWordmark(ctx: CanvasRenderingContext2D, assets: SushiArtAsse
 export function drawMenuSushiPlates(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, width: number, height: number) {
   const y = height - 105;
   drawSushiPlate(ctx, assets, "hotate", width * .19, y, 178);
-  drawSushiPlate(ctx, assets, "ebi", width * .42, y - 14, 196, true);
+  drawSushiPlate(ctx, assets, "maguro", width * .42, y - 14, 196, true);
   drawSushiPlate(ctx, assets, "ikura", width * .65, y - 4, 182);
-  drawSushiPlate(ctx, assets, "tako", width * .86, y + 4, 168);
+  drawSushiPlate(ctx, assets, "tekka", width * .86, y + 4, 168);
 }
