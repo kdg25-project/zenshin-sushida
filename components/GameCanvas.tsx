@@ -37,14 +37,15 @@ function phaseFor(props: Props): Phase {
   if (props.session.status === "playing" || props.session.status === "countdown") return "play";
   return "calibration";
 }
-function text(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, size = 20, color = "#392915", align: CanvasTextAlign = "left", family = `"Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif`) {
-  ctx.fillStyle = color; ctx.font = `800 ${size}px ${family}`; ctx.textAlign = align; ctx.textBaseline = "middle"; ctx.fillText(value, x, y);
+const pixelFont = `"SushiDigits", "SushiLine", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif`;
+const digitFont = `"SushiDigits", ui-monospace, monospace`;
+const canvasFontWeight = (family: string) => family.includes('"SushiDigits"') ? 400 : 800;
+function text(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, size = 20, color = "#392915", align: CanvasTextAlign = "left", family = pixelFont) {
+  ctx.fillStyle = color; ctx.font = `${canvasFontWeight(family)} ${size}px ${family}`; ctx.textAlign = align; ctx.textBaseline = "middle"; ctx.fillText(value, x, y);
 }
 function wrapped(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, size: number, color: string, max: number, align: CanvasTextAlign = "center") {
   wrapCanvasText(value, max).forEach((line, i) => text(ctx, line, x, y + i * (size + 7), size, color, align));
 }
-const pixelFont = `"SushiLine", "Arial Black", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif`;
-const digitFont = `"SushiDigits", ui-monospace, monospace`;
 function pixelFrame(ctx: CanvasRenderingContext2D, rect: Rect, fill = "#fde0b4", border = "#100d0a", inset = 7) {
   ctx.save();
   ctx.fillStyle = "#150e0b";
@@ -147,7 +148,7 @@ function wordTrack(ctx: CanvasRenderingContext2D, progress: SushiWordProgress, x
   });
 }
 function fittedText(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, preferredSize: number, minimumSize: number, maxWidth: number, color: string, family: string) {
-  const size = fittedTextSize(size => { ctx.font = `800 ${size}px ${family}`; return ctx.measureText(value).width; }, preferredSize, minimumSize, maxWidth);
+  const size = fittedTextSize(size => { ctx.font = `${canvasFontWeight(family)} ${size}px ${family}`; return ctx.measureText(value).width; }, preferredSize, minimumSize, maxWidth);
   text(ctx, value, x, y, size, color, "center", family);
 }
 function drawLane(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, reference: SfUiAssets | undefined, props: Props, width: number, portrait: boolean, time: number, animate: boolean) {
@@ -269,7 +270,7 @@ function crown(ctx: CanvasRenderingContext2D, x: number, y: number, value: numbe
   ctx.beginPath(); ctx.moveTo(-20, 4); ctx.lineTo(-21, -21); ctx.lineTo(-7, -8); ctx.lineTo(0, -30); ctx.lineTo(8, -8); ctx.lineTo(21, -21); ctx.lineTo(20, 4); ctx.closePath(); ctx.fill(); ctx.fillRect(-20, 4, 40, 17); ctx.strokeStyle = "#fff4cf"; ctx.lineWidth = 3; ctx.stroke(); text(ctx, String(value), 0, 14, 18, "#17100a", "center", digitFont); ctx.restore();
 }
 function fittedRankingText(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, preferred: number, minimum: number, maxWidth: number, color: string, align: CanvasTextAlign, family: string) {
-  const size = fittedTextSize(next => { ctx.font = `800 ${next}px ${family}`; return ctx.measureText(value).width; }, preferred, minimum, maxWidth);
+  const size = fittedTextSize(next => { ctx.font = `${canvasFontWeight(family)} ${next}px ${family}`; return ctx.measureText(value).width; }, preferred, minimum, maxWidth);
   text(ctx, value, x, y, size, color, align, family);
 }
 function rankRow(ctx: CanvasRenderingContext2D, reference: SfUiAssets | undefined, row: RankEntry, rank: number, y: number, x: number, width: number, height: number, portrait: boolean, cells: { name: { x:number; width:number }; score: { x:number; width:number } }) {
