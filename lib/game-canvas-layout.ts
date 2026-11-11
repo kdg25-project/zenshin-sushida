@@ -46,12 +46,12 @@ export const gameRects = {
   rankingBack: { x: 141, y: 600, width: 156, height: 56 },
   rankingRefresh: { x: 905, y: 600, width: 156, height: 56 },
   rankingRetry: { x: 440, y: 510, width: 320, height: 40 },
-  rankingPrevious: { x: 438, y: 568, width: 44, height: 42 },
-  rankingPage1: { x: 488, y: 568, width: 44, height: 42 },
-  rankingPage2: { x: 538, y: 568, width: 44, height: 42 },
-  rankingPage3: { x: 588, y: 568, width: 44, height: 42 },
-  rankingPage4: { x: 638, y: 568, width: 44, height: 42 },
-  rankingNext: { x: 688, y: 568, width: 44, height: 42 },
+  rankingPrevious: { x: 436, y: 573, width: 48, height: 42 },
+  rankingPage1: { x: 488, y: 573, width: 48, height: 42 },
+  rankingPage2: { x: 540, y: 573, width: 48, height: 42 },
+  rankingPage3: { x: 592, y: 573, width: 48, height: 42 },
+  rankingPage4: { x: 644, y: 573, width: 48, height: 42 },
+  rankingNext: { x: 696, y: 573, width: 48, height: 42 },
   camera: desktopScene.calibrationCamera,
   target: desktopScene.calibrationGuide,
   world: { x: 205, y: 88, width: 790, height: 226 },
@@ -119,8 +119,8 @@ export function rankingCanvasGeometry(portrait: boolean) {
   return { card, inner, table, headerY: portrait ? 190 : 162, columns: portrait ? { rankCenter:90, name:{ x:143, width:260 }, score:{ x:421, width:116 } } : { rankCenter:289, name:{ x:505, width:280 }, score:{ x:805, width:150 } } };
 }
 
-/** The medal silhouette is intentionally bounded by one table row at every viewport size. */
-export function rankingCrownRect(row: Rect, portrait: boolean): Rect { return { x: row.x + (portrait ? 32 : 77), y: row.y + (row.height - 32) / 2, width:36, height:32 }; }
+/** The source crown has the same visual weight as a normal rank badge, while staying inside one row. */
+export function rankingCrownRect(row: Rect, portrait: boolean): Rect { return { x: row.x + (portrait ? 23 : 68), y: row.y + (row.height - 32) / 2, width:54, height:32 }; }
 
 export function fitGameViewport(width: number, height: number, compact = gameLayoutModeForWidth(width) === "portrait") {
   const logicalWidth = compact ? PORTRAIT_WIDTH : GAME_WIDTH, logicalHeight = compact ? PORTRAIT_HEIGHT : GAME_HEIGHT;
