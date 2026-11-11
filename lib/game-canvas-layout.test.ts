@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GAME_HEIGHT, GAME_WIDTH, type Rect, canvasBackingRect, containVideo, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, hudSnapshotKey, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, rectsOverlap, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
+import { GAME_HEIGHT, GAME_WIDTH, type Rect, canvasBackingRect, containVideo, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, hudSnapshotKey, playFeedbackLayout, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, rectsOverlap, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
 import { POSE_TEMPLATES } from "./pose";
 import { SUSHI_WORDS } from "./sushi-words";
 
@@ -129,6 +129,17 @@ describe("game canvas layout", () => {
     expect(desktopScene.playGuide.y + desktopScene.playGuide.height).toBeLessThanOrEqual(desktopScene.playFeedback.y);
     expect(desktopScene.playCamera.y + desktopScene.playCamera.height).toBeLessThanOrEqual(desktopScene.playFeedback.y);
     expect(desktopScene.playFeedback.y + desktopScene.playFeedback.height).toBeLessThanOrEqual(GAME_HEIGHT);
+  });
+
+  it("keeps the feedback label and ambiguity hint above a separate meter band", () => {
+    for (const [feedback, portrait] of [[desktopScene.playFeedback, false], [{ x:30, y:638, width:540, height:82 }, true]] as const) {
+      const layout=playFeedbackLayout(feedback,portrait);
+      expect(layout.labelBand.x).toBeGreaterThanOrEqual(feedback.x);expect(layout.hintBand.x + layout.hintBand.width).toBeLessThanOrEqual(feedback.x + feedback.width);
+      expect(layout.labelBand.y + layout.labelBand.height).toBeLessThanOrEqual(layout.meter.y);
+      expect(layout.hintBand.y + layout.hintBand.height).toBeLessThanOrEqual(layout.meter.y);
+      expect(layout.meter.y + layout.meter.height).toBeLessThanOrEqual(feedback.y + feedback.height);
+      if (!portrait) expect(layout.labelBand.x + layout.labelBand.width).toBeLessThanOrEqual(layout.hintBand.x);
+    }
   });
 
   it("keeps HUD cards between the lanterns and free of collisions", () => {

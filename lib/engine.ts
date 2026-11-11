@@ -1,10 +1,12 @@
 import { type JointName, type Landmark, type NormalizedPose, type Point, INDEX, REQUIRED_JOINTS, POSE_TEMPLATES, type PoseTemplate } from "./pose";
-import { GAME_DURATION_MS, POSE_HOLD_MS, POSE_TEMPLATE_VERSION, POSE_THRESHOLD } from "./game-rules";
+import { GAME_DURATION_MS, POSE_HOLD_MS, POSE_MATCH_MARGIN, POSE_TEMPLATE_VERSION, POSE_THRESHOLD } from "./game-rules";
 import { type RomajiLetter, type SushiWord, type SushiWordId, type SushiWordProgress, seededRandom, shuffledWordIds, sushiWord, wordSequence } from "./sushi-words";
 
 export type MatcherResult = { valid: boolean; accuracy: number; jointScore: number; angleScore: number; pathScore: number; reason?: string; pose?: NormalizedPose };
+/** A valid camera pose may still be too similar to another ROMAJI silhouette to solve. */
+export type GuardedMatcherResult = MatcherResult & { accepted: boolean; nearestTemplateId?: string; margin?: number };
 export type GameConfig = { durationMs: number; threshold: number; holdMs: number; scoreVersion: string; rulesVersion: string; templateVersion: string; wordVersion: string; maxFrameGapMs: number };
-export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v2", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v6", maxFrameGapMs: 180 };
+export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v3", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v6", maxFrameGapMs: 180 };
 
 const finite = (p: Point | undefined): p is Point => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -68,12 +70,25 @@ export function matchNormalizedPose(actual: NormalizedPose, template: PoseTempla
   return {valid:true,accuracy:jointScore*.35+angleScore*.45+pathScore*.20,jointScore,angleScore,pathScore,pose:actual};
 }
 
+/**
+ * Scores the target against the full ROMAJI set. This intentionally keeps
+ * `valid` about landmark quality only: callers can continue to render a valid
+ * skeleton and keep camera readiness even when the letter is ambiguous.
+ */
+export function matchTargetPose(actual: NormalizedPose, template: PoseTemplate, threshold = POSE_THRESHOLD): GuardedMatcherResult {
+  const target = matchNormalizedPose(actual,template);
+  if (!target.valid) return { ...target, accepted:false };
+  const nearest = POSE_TEMPLATES.filter(candidate=>candidate.id!==template.id).map(candidate=>({ id:candidate.id, score:matchNormalizedPose(actual,candidate).accuracy })).reduce((best,current)=>current.score>best.score?current:best,{id:"",score:-Infinity});
+  const margin=target.accuracy-nearest.score;
+  return { ...target, accepted:target.accuracy>=threshold&&margin>=POSE_MATCH_MARGIN, nearestTemplateId:nearest.id||undefined, margin };
+}
+
 export type GameStatus = "idle"|"camera-check"|"countdown"|"playing"|"result";
 export type SolveEvent = { templateId:string; wordId:SushiWordId; wordIndex:number; letterIndex:number; at:number; accuracy:number; combo:number; points:number };
 /** `targetIndex` is the flattened character cursor; a dish skip advances it past remaining letters. */
 export type RoundEvent = {kind:"solve"|"skip"; targetIndex:number; templateId:string; wordId:SushiWordId; wordIndex:number; letterIndex:number; at:number; accuracy?:number};
-export type GameSession = { status:GameStatus; config:GameConfig; startedAt?:number; countdownUntil?:number; targetIndex:number; order:SushiWordId[]; wordIndex:number; letterIndex:number; used:string[]; completedWordIds:SushiWordId[]; score:number; combo:number; maxCombo:number; successes:SolveEvent[]; events:RoundEvent[]; holdSince?:number; lastFrameAt?:number; lastTemplateId?:string; lastAccuracy?:number; endedAt?:number };
-export const createSession=(config:GameConfig=DEFAULT_CONFIG):GameSession=>({status:"idle",config,targetIndex:0,order:[],wordIndex:0,letterIndex:0,used:[],completedWordIds:[],score:0,combo:0,maxCombo:0,successes:[],events:[],lastAccuracy:undefined});
+export type GameSession = { status:GameStatus; config:GameConfig; startedAt?:number; countdownUntil?:number; targetIndex:number; order:SushiWordId[]; wordIndex:number; letterIndex:number; used:string[]; completedWordIds:SushiWordId[]; score:number; combo:number; maxCombo:number; successes:SolveEvent[]; events:RoundEvent[]; holdSince?:number; lastFrameAt?:number; lastTemplateId?:string; lastAccuracy?:number; matchHint?:string; endedAt?:number };
+export const createSession=(config:GameConfig=DEFAULT_CONFIG):GameSession=>({status:"idle",config,targetIndex:0,order:[],wordIndex:0,letterIndex:0,used:[],completedWordIds:[],score:0,combo:0,maxCombo:0,successes:[],events:[],lastAccuracy:undefined,matchHint:undefined});
 
 export { seededRandom, wordSequence };
 /** Compatibility helper: the seeded sequence of actual letter-template IDs. */
@@ -98,16 +113,17 @@ function advanceWord(session: GameSession, random: () => number): Pick<GameSessi
 }
 
 export function beginPlaying(session:GameSession, now:number, random:()=>number=Math.random):GameSession {
-  return {...session,status:"countdown",countdownUntil:now+3500,order:shuffledWordIds(random),wordIndex:0,letterIndex:0,targetIndex:0,score:0,combo:0,maxCombo:0,successes:[],events:[],used:[],completedWordIds:[],holdSince:undefined,lastFrameAt:undefined,lastAccuracy:undefined};
+  return {...session,status:"countdown",countdownUntil:now+3500,order:shuffledWordIds(random),wordIndex:0,letterIndex:0,targetIndex:0,score:0,combo:0,maxCombo:0,successes:[],events:[],used:[],completedWordIds:[],holdSince:undefined,lastFrameAt:undefined,lastAccuracy:undefined,matchHint:undefined};
 }
 export function advanceTime(session:GameSession, now:number):GameSession { if(session.status==="countdown"&&now>=(session.countdownUntil??now)) return {...session,status:"playing",startedAt:now,holdSince:undefined,lastFrameAt:undefined}; if(session.status==="playing"&&now>=(session.startedAt??now)+session.config.durationMs) return {...session,status:"result",endedAt:now,holdSince:undefined}; return session; }
 export function scoreFor(accuracy:number, combo:number){ return Math.round(100+accuracy*100+Math.min(combo,20)*12); }
-export function observe(session:GameSession, now:number, accuracy:number, valid=true):GameSession {
+/** `displayedAccuracy` is intentionally independent of acceptance: an ambiguous but detected pose still updates the meter. */
+export function observe(session:GameSession, now:number, accuracy:number, accepted=true, displayedAccuracy=accepted&&Number.isFinite(accuracy)?accuracy:0):GameSession {
   const progressed=advanceTime(session,now); if(progressed.status!=="playing") return progressed;
   const frameGap=progressed.lastFrameAt===undefined?0:now-progressed.lastFrameAt;
   const word=currentWord(progressed), targetId=word.romaji[progressed.letterIndex] as RomajiLetter;
-  const matches=valid&&Number.isFinite(accuracy)&&accuracy>=progressed.config.threshold&&frameGap<=progressed.config.maxFrameGapMs;
-  const base={...progressed,lastFrameAt:now,lastAccuracy:valid&&Number.isFinite(accuracy)?accuracy:0};
+  const matches=accepted&&Number.isFinite(accuracy)&&accuracy>=progressed.config.threshold&&frameGap<=progressed.config.maxFrameGapMs;
+  const base={...progressed,lastFrameAt:now,lastAccuracy:Number.isFinite(displayedAccuracy)?displayedAccuracy:0};
   if(!matches) return {...base,holdSince:undefined};
   const holdSince=base.holdSince===undefined?now:base.holdSince;
   if(now-holdSince<base.config.holdMs) return {...base,holdSince};

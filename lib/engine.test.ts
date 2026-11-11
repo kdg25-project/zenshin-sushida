@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, advanceTime, beginPlaying, completedPlates, createSession, currentTemplate, currentWordProgress, gameResult, matchPose, normalizeLandmarks, observe, skipTarget, syntheticLandmarks, upcomingWords, type GameSession } from "./engine";
-import { POSE_TEMPLATES, type Landmark } from "./pose";
+import { DEFAULT_CONFIG, advanceTime, beginPlaying, completedPlates, createSession, currentTemplate, currentWordProgress, gameResult, matchPose, matchTargetPose, normalizeLandmarks, observe, skipTarget, syntheticLandmarks, upcomingWords, type GameSession } from "./engine";
+import { INDEX, POSE_TEMPLATES, REQUIRED_JOINTS, type JointName, type Landmark, type NormalizedPose, type Point } from "./pose";
 import { ROMAJI_ALPHABET, SUSHI_WORDS, wordSequence } from "./sushi-words";
 import { POSE_TEMPLATE_VERSION, RULES_KEY, serializeRelativeEventTime } from "./game-rules";
 
@@ -14,11 +14,33 @@ function horizontallyMirrored(landmarks: Landmark[]): Landmark[] {
  return landmarks.map(landmark => ({ ...landmark, x: 1 - landmark.x }));
 }
 const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+const sub = (a: Point, b: Point) => ({ x:a.x-b.x, y:a.y-b.y });
+const rotate = (point: Point, degrees: number) => { const radians=degrees*Math.PI/180, cosine=Math.cos(radians), sine=Math.sin(radians); return { x:point.x*cosine-point.y*sine, y:point.x*sine+point.y*cosine }; };
+const add = (a: Point, b: Point) => ({ x:a.x+b.x, y:a.y+b.y });
+
+/** Deterministic natural limb relaxation, then the same raw-frame pipeline as MediaPipe input. */
+function naturallyBent(source: NormalizedPose, degrees: number): NormalizedPose {
+ const pose=Object.fromEntries(REQUIRED_JOINTS.map(name=>[name,{...source[name]}])) as NormalizedPose;
+ for(const side of ["left","right"] as const){
+  const shoulder=`${side}Shoulder` as JointName,elbow=`${side}Elbow` as JointName,wrist=`${side}Wrist` as JointName,hip=`${side}Hip` as JointName,knee=`${side}Knee` as JointName,ankle=`${side}Ankle` as JointName,turn=side==="left"?-degrees:degrees;
+  pose[elbow]=add(pose[shoulder],rotate(sub(source[elbow],source[shoulder]),turn));
+  pose[wrist]=add(pose[elbow],rotate(sub(source[wrist],source[elbow]),-turn));
+  pose[knee]=add(pose[hip],rotate(sub(source[knee],source[hip]),turn/2));
+  pose[ankle]=add(pose[knee],rotate(sub(source[ankle],source[knee]),-turn/2));
+ }
+ return pose;
+}
+function rawFromNormalized(pose: NormalizedPose, aspect=16/9): Landmark[] {
+ const landmarks: Landmark[]=Array.from({length:33},()=>({x:.5,y:.5,visibility:1})), shoulderWidth=.075, hip={x:.5,y:.55};
+ for(const name of REQUIRED_JOINTS){const point=pose[name];landmarks[INDEX[name]]={x:hip.x-point.x*shoulderWidth,y:hip.y+point.y*shoulderWidth*aspect,visibility:1};}
+ return landmarks;
+}
+function normalizedBent(template: typeof POSE_TEMPLATES[number], degrees: number) { return normalizeLandmarks(rawFromNormalized(naturallyBent(template.pose,degrees)),16/9).pose!; }
 
 describe("pose matcher",()=>{
  it("recognizes every exact provisional pose despite a wide source aspect",()=>{for(const pose of POSE_TEMPLATES){const score=matchPose(syntheticLandmarks(pose,16/9),16/9,pose);expect(score.valid).toBe(true);expect(score.accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);}});
  it("uses exactly the canonical ROMAJI letters and rejects an obviously different pose",()=>{expect(POSE_TEMPLATES.map(pose=>pose.id)).toEqual([...ROMAJI_ALPHABET]);const upright=POSE_TEMPLATES.find(x=>x.id==="M")!, handsDown=POSE_TEMPLATES.find(x=>x.id==="I")!;expect(matchPose(syntheticLandmarks(handsDown),16/9,upright).accuracy).toBeLessThan(DEFAULT_CONFIG.threshold);});
- it("uses the current pose template version in both gameplay and leaderboard isolation",()=>{expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(RULES_KEY).toContain(`|${POSE_TEMPLATE_VERSION}|`);});
+ it("uses the current pose template version and guarded rules in gameplay and leaderboard isolation",()=>{expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(DEFAULT_CONFIG.rulesVersion).toBe("rules-v3");expect(RULES_KEY).toBe(`rules-v3|score-v1|words-v6|${POSE_TEMPLATE_VERSION}|60000|0.75|400`);});
  it("keeps every limb in a plausible standing range and preserves key letter silhouettes",()=>{
   for(const template of POSE_TEMPLATES) for(const [start,end] of [["leftShoulder","leftElbow"],["leftElbow","leftWrist"],["rightShoulder","rightElbow"],["rightElbow","rightWrist"],["leftHip","leftKnee"],["leftKnee","leftAnkle"],["rightHip","rightKnee"],["rightKnee","rightAnkle"]] as const) { const length=distance(template.pose[start],template.pose[end]);expect(length,`${template.id}:${start}-${end}`).toBeGreaterThan(.5);expect(length,`${template.id}:${start}-${end}`).toBeLessThan(1.5); }
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
@@ -30,7 +52,13 @@ describe("pose matcher",()=>{
   expect(C.leftWrist.y).toBeLessThan(C.leftElbow.y);expect(C.rightWrist.y).toBeGreaterThan(C.rightElbow.y);
   expect(H.leftWrist.y).toBeGreaterThan(H.leftElbow.y);expect(H.rightWrist.y).toBeGreaterThan(H.rightElbow.y);expect(Math.abs(H.leftAnkle.x-H.rightAnkle.x)).toBeGreaterThan(1.5);
  });
- it("keeps every adopted character pose distinct at the play threshold",()=>{for(const actual of POSE_TEMPLATES)for(const target of POSE_TEMPLATES)if(actual.id!==target.id)expect(matchPose(syntheticLandmarks(actual,16/9),16/9,target).accuracy,`${actual.character} must not solve ${target.character}`).toBeLessThan(DEFAULT_CONFIG.threshold);});
+ it("requires the target to be five points clearer than every other adopted character",()=>{for(const actual of POSE_TEMPLATES)for(const target of POSE_TEMPLATES)if(actual.id!==target.id){const normalized=normalizeLandmarks(syntheticLandmarks(actual,16/9),16/9).pose!;expect(matchTargetPose(normalized,target,DEFAULT_CONFIG.threshold).accepted,`${actual.character} must not solve ${target.character}`).toBe(false);}});
+ it("accepts exact raw frames and the measured 10°/20° natural-bend subsets without accepting a deformed wrong letter",()=>{
+  for(const template of POSE_TEMPLATES){const normalized=normalizeLandmarks(rawFromNormalized(template.pose),16/9).pose!;expect(matchTargetPose(normalized,template,DEFAULT_CONFIG.threshold).accepted,template.id).toBe(true);}
+  const accepted10=POSE_TEMPLATES.filter(template=>matchTargetPose(normalizedBent(template,10),template,DEFAULT_CONFIG.threshold).accepted),accepted20=POSE_TEMPLATES.filter(template=>matchTargetPose(normalizedBent(template,20),template,DEFAULT_CONFIG.threshold).accepted);
+  expect(accepted10).toHaveLength(13);expect(accepted20).toHaveLength(10);
+  for(const actual of POSE_TEMPLATES){const normalized=normalizedBent(actual,20);for(const target of POSE_TEMPLATES)if(target.id!==actual.id)expect(matchTargetPose(normalized,target,DEFAULT_CONFIG.threshold).accepted,`${actual.id} must not solve ${target.id}`).toBe(false);}
+ });
  it("maps raw front-facing anatomical sides into canonical mirrored-viewer scoring coordinates",()=>{
   const rightDiagonal=POSE_TEMPLATES.find(template=>template.id==="K")!,leftDiagonal=POSE_TEMPLATES.find(template=>template.id==="N")!;
   const rightDiagonalRaw=rawFixture({11:[.55,.45],12:[.45,.45],13:[.578,.54],14:[.382,.395],15:[.578,.642],16:[.318,.33],23:[.532,.55],24:[.468,.55],25:[.532,.67],26:[.418,.652],27:[.532,.78],28:[.378,.76]});
@@ -64,6 +92,26 @@ describe("game engine",()=>{
  const solveLetter=(game:ReturnType<typeof createSession>, start:number)=>[0,100,200,300,400].reduce((next,offset)=>observe(next,start+offset,.95,true),game);
  it("requires a continuous hold and only awards once",()=>{let game=advanceTime(beginPlaying(createSession(),0,rng),3500);for(const at of [3500,3600,3700,3800]) game=observe(game,at,.95,true);expect(game.successes).toHaveLength(0);game=observe(game,3900,.95,true);expect(game.successes).toHaveLength(1);const score=game.score;game=observe(game,3920,.95,true);expect(game.score).toBe(score);});
  it("resets a hold across mismatch and long frame gaps",()=>{let game=advanceTime(beginPlaying(createSession(),0,rng),3500);game=observe(game,3500,.95,true);game=observe(game,3600,.5,true);for(const at of [3650,3750,3850])game=observe(game,at,.95,true);expect(game.successes).toHaveLength(0);for(const at of [3950,4050])game=observe(game,at,.95,true);expect(game.successes).toHaveLength(1);});
+ it("does not hold an above-threshold pose that is too close to another letter",()=>{
+  const actual=POSE_TEMPLATES.find(template=>template.id==="G")!,target=POSE_TEMPLATES.find(template=>template.id==="S")!,matched=matchTargetPose(normalizedBent(actual,20),target,DEFAULT_CONFIG.threshold);
+  expect(matched.valid).toBe(true);expect(matched.accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);expect(matched.nearestTemplateId).toBe("G");expect(matched.accepted).toBe(false);
+  let game:GameSession={...createSession(),status:"playing",startedAt:0,order:["ebi"],wordIndex:0,letterIndex:0,targetIndex:0};
+  for(const at of [0,100,200,300,400]) game=observe(game,at,matched.accuracy,matched.accepted);
+  expect(game.successes).toHaveLength(0);expect(game.holdSince).toBeUndefined();
+ });
+ it("keeps the latest detected accuracy visible while an ambiguous pose is rejected",()=>{
+  let game:GameSession={...createSession(),status:"playing",startedAt:0,order:["ebi"],wordIndex:0,letterIndex:0,targetIndex:0};
+  game=observe(game,0,.82,false,.82);
+  expect(game.lastAccuracy).toBe(.82);expect(game.holdSince).toBeUndefined();expect(game.successes).toHaveLength(0);
+  game=observe(game,100,.79,false,.79);
+  expect(game.lastAccuracy).toBe(.79);expect(game.holdSince).toBeUndefined();expect(game.successes).toHaveLength(0);
+  game=observe(game,200,.82,true,.82);
+  expect(game.holdSince).toBe(200);
+  game=observe(game,300,.81,false,.81);
+  expect(game.lastAccuracy).toBe(.81);expect(game.holdSince).toBeUndefined();expect(game.successes).toHaveLength(0);
+  game=observe(game,400,0,false);
+  expect(game.lastAccuracy).toBe(0);
+ });
  it("ends at deadline, rejects later scores, and skip resets combo only",()=>{let game=advanceTime(beginPlaying(createSession(),0,rng),3500);for(const at of [3500,3600,3700,3800,3900])game=observe(game,at,.95,true);expect(game.combo).toBe(1);const score=game.score;game={...game,combo:3}; const before=game.score;game={...game,status:"playing"}; game=observe(game,(game.startedAt??0)+60_000,.99,true);expect(game.status).toBe("result");expect(game.score).toBe(before);expect(score).toBeGreaterThan(0);});
  it("keeps a legal sub-millisecond final solve below the exclusive deadline",()=>{
   let game:GameSession={...createSession(),status:"playing",startedAt:0,order:["ebi","uni"],wordIndex:0,letterIndex:0,targetIndex:0};

@@ -31,6 +31,14 @@ export const desktopScene = {
   calibrationMessage: { x: 180, y: 414, width: 840, height: 46 },
 } as const satisfies Record<string, Rect>;
 
+/** Reserved text bands keep the feedback copy clear of the meter in both layouts. */
+export function playFeedbackLayout(feedback: Rect, portrait: boolean) {
+  const inset = portrait ? 20 : 16, meter = { x:feedback.x + inset, y:feedback.y + feedback.height - (portrait ? 22 : 12), width:feedback.width - inset * 2, height:portrait ? 11 : 7 };
+  if (portrait) return { meter, labelBand:{ x:meter.x, y:feedback.y + 10, width:meter.width, height:22 }, hintBand:{ x:meter.x, y:feedback.y + 32, width:meter.width, height:22 } };
+  const labelWidth=152, gap=8;
+  return { meter, labelBand:{ x:meter.x, y:feedback.y + 4, width:labelWidth, height:16 }, hintBand:{ x:meter.x + labelWidth + gap, y:feedback.y + 4, width:meter.width - labelWidth - gap, height:16 } };
+}
+
 export const gameRects = {
   name: { x: 405, y: 220, width: 390, height: 44 },
   menuCamera: { x: 390, y: 304, width: 420, height: 48 },

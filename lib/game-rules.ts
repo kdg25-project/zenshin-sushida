@@ -1,10 +1,12 @@
 export const GAME_DURATION_MS = 60_000;
-export const POSE_THRESHOLD = .86;
+export const POSE_THRESHOLD = .75;
+/** A score alone is insufficient when two ROMAJI silhouettes are near-identical. */
+export const POSE_MATCH_MARGIN = .05;
 export const POSE_HOLD_MS = 400;
 export const POSE_TEMPLATE_VERSION = "poses-v4";
 
 /** Changing this isolates leaderboards and invalidates previous replay contracts. */
-export const RULES_KEY = `rules-v2|score-v1|words-v6|${POSE_TEMPLATE_VERSION}|60000|0.86|400`;
+export const RULES_KEY = `rules-v3|score-v1|words-v6|${POSE_TEMPLATE_VERSION}|60000|0.75|400`;
 
 /**
  * Event timestamps are relative to a started round. Flooring preserves a legal
