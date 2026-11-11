@@ -56,7 +56,7 @@ function noisyPose(source: NormalizedPose, seed: number): NormalizedPose {
 describe("pose matcher",()=>{
  it("recognizes every exact provisional pose despite a wide source aspect",()=>{for(const pose of POSE_TEMPLATES){const score=matchPose(syntheticLandmarks(pose,16/9),16/9,pose);expect(score.valid).toBe(true);expect(score.accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);}});
  it("uses exactly the canonical ROMAJI letters and rejects an obviously different pose",()=>{expect(POSE_TEMPLATES.map(pose=>pose.id)).toEqual([...ROMAJI_ALPHABET]);const upright=POSE_TEMPLATES.find(x=>x.id==="M")!, handsDown=POSE_TEMPLATES.find(x=>x.id==="I")!;expect(matchPose(syntheticLandmarks(handsDown),16/9,upright).accuracy).toBeLessThan(DEFAULT_CONFIG.threshold);});
- it("uses the current pose template version and guarded rules in gameplay and leaderboard isolation",()=>{expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(DEFAULT_CONFIG.rulesVersion).toBe("rules-v4");expect(RULES_KEY).toBe(`rules-v4|score-v1|words-v6|${POSE_TEMPLATE_VERSION}|60000|0.75|400`);});
+ it("uses the current pose template version and guarded rules in gameplay and leaderboard isolation",()=>{expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(DEFAULT_CONFIG.rulesVersion).toBe("rules-v5");expect(RULES_KEY).toBe(`rules-v5|score-v1|words-v6|${POSE_TEMPLATE_VERSION}|60000|0.75|400`);});
  it("keeps every limb in a plausible standing range and preserves key letter silhouettes",()=>{
   for(const template of POSE_TEMPLATES) for(const [start,end] of [["leftShoulder","leftElbow"],["leftElbow","leftWrist"],["rightShoulder","rightElbow"],["rightElbow","rightWrist"],["leftHip","leftKnee"],["leftKnee","leftAnkle"],["rightHip","rightKnee"],["rightKnee","rightAnkle"]] as const) { const length=distance(template.pose[start],template.pose[end]);expect(length,`${template.id}:${start}-${end}`).toBeGreaterThan(.5);expect(length,`${template.id}:${start}-${end}`).toBeLessThan(1.5); }
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
@@ -76,15 +76,19 @@ describe("pose matcher",()=>{
   expect(accepted10).toHaveLength(15);expect(accepted20).toHaveLength(13);
   for(const actual of POSE_TEMPLATES){const normalized=normalizedBent(actual,20);for(const target of POSE_TEMPLATES)if(target.id!==actual.id)expect(matchTargetPose(normalized,target,DEFAULT_CONFIG.threshold).accepted,`${actual.id} must not solve ${target.id}`).toBe(false);}
  });
- it("admits the approved E/K and M relaxation boundary while retaining the G/S ambiguity guard",()=>{
+ it("admits the approved E/K, G and M relaxation boundary while retaining the G/S ambiguity guard",()=>{
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
   const e=byId("E"),k=byId("K"),g=byId("G"),s=byId("S"),m=byId("M");
   expect(matchTargetPose(normalizeLandmarks(rawFromNormalized(naturallyBent(k.pose,35)),16/9).pose!,k).accepted).toBe(true);
   expect(matchTargetPose(normalizeLandmarks(rawFromNormalized(naturallyBent(k.pose,40)),16/9).pose!,k).accepted).toBe(true);
   expect(matchTargetPose(normalizeLandmarks(rawFromNormalized(armsBent(e.pose,0,50)),16/9).pose!,e).accepted).toBe(true);
   expect(matchTargetPose(normalizedBent(g,10),g).accepted).toBe(true);
+  expect(matchTargetPose(normalizedBent(g,20),g).accepted).toBe(true);
+  for(let seed=1;seed<=5;seed++)expect(matchTargetPose(noisyPose(naturallyBent(g.pose,20),seed),g).accepted,`G/20°/seed${seed}`).toBe(true);
   expect(matchTargetPose(normalizedBent(m,20),m).accepted).toBe(true);expect(matchTargetPose(normalizedBent(m,30),m).accepted).toBe(true);
-  const ambiguous=matchTargetPose(noisyPose(naturallyBent(g.pose,30),1),s);
+  const v5G: NormalizedPose={...g.pose,leftElbow:{x:-.9,y:-1.5},leftWrist:{x:-.65,y:-1.95},rightElbow:{x:1.35,y:-.8},rightWrist:{x:.7,y:-.65},leftKnee:{x:-.55,y:1.16},rightKnee:{x:.55,y:1.16},leftAnkle:{x:-.7,y:2.2},rightAnkle:{x:.7,y:2.2}};
+  expect(matchTargetPose(v5G,g).accepted).toBe(true);
+  const ambiguous=matchTargetPose(noisyPose(naturallyBent(v5G,30),1),s);
   expect(ambiguous).toMatchObject({valid:true,accepted:false});expect(ambiguous.accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);expect(ambiguous.margin).toBeGreaterThanOrEqual(.03);expect(ambiguous.margin).toBeLessThan(.05);
  });
  it("rejects every wrong template through 30° bends and five deterministic body-noise variants",()=>{
