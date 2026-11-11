@@ -115,7 +115,7 @@ describe("sushi dish deck", () => {
       expect(image.width).toBe(id === "tekka" ? 320 : 32);
       expect(image.height).toBe(id === "tekka" ? 240 : ["ikura", "negitoro", "uni"].includes(id) ? 30 : 24);
       expect(manifest[id]?.sourceSha256).toMatch(/^[a-f\d]{64}$/);
-      expect(manifest[id]?.mode).toBe(id === "tekka" ? "native-no-export-grid" : "grid");
+      expect(manifest[id]?.mode).toBe(id === "tekka" ? "native" : "grid");
       for (let offset = 3; offset < image.rgba.length; offset += 4) expect([0, 255]).toContain(image.rgba[offset]);
       if (id in LEGACY_PNG_SHA256) expect(createHash("sha256").update(readFileSync(`public/assets/sushi-pixel/${id}.png`)).digest("hex")).toBe(LEGACY_PNG_SHA256[id as keyof typeof LEGACY_PNG_SHA256]);
     }
@@ -126,7 +126,7 @@ describe("sushi dish deck", () => {
     for (let offset = 0; offset < tekka.rgba.length; offset += 4) { const color = [...tekka.rgba.subarray(offset, offset + 4)].join(","); colors.set(color, (colors.get(color) ?? 0) + 1); }
     expect(colors.get("92,119,189,255")).toBeGreaterThan(0); // retained blue plate
     expect(colors.get("0,0,0,255")).toBeGreaterThan(0); // default fill for stroke-only cls-2
-    expect(colors.get("204,204,204,255") ?? 0).toBe(0); // removed export grid, not foreground gray
+    expect(colors.get("46,46,46,255")).toBeGreaterThan(0); // retained nori gray
   }, 15_000);
 
   it("deals every supplied dish once before repeating for each deterministic seed", () => {

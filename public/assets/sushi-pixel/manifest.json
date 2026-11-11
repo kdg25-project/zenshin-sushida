@@ -73,11 +73,11 @@
   },
   "tekka": {
     "source": "TEKKAMAKI.svg",
-    "sourceSha256": "0d8c0707293f0f2f92c67e8bd9737c723a824b3c466d6ad253860d9fc212a4a8",
+    "sourceSha256": "a5c04ad167e3031d9aa619553a4bd09632e60f33af5ee4fd6f182fca80e9cee7",
     "width": 320,
     "height": 240,
     "alpha": "opaque-or-transparent",
-    "mode": "native-no-export-grid"
+    "mode": "native"
   },
   "uni": {
     "source": "UNI.svg",

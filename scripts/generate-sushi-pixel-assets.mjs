@@ -8,11 +8,9 @@
  * rasterizing those SVGs at runtime leaves anti-aliased seams between cells.
  * This generator intentionally reads only the filled cell color and painter
  * order, rounds each cell to the source's 10px grid, and writes an opaque-or-
- * transparent PNG. TEKKAMAKI is a separately supplied illustration with an
- * 8.43×8.09px foreground grid plus an Illustrator export background layer; it
- * is rendered at its native 320×240 source pixels after proving the complete
- * 32×24 grid and omitting only its gray cls-3 background cells. It never writes
- * to the SVG sources.
+ * transparent PNG. TEKKAMAKI has fractional foreground cells, so it is
+ * rasterized at its native 320×240 source resolution. It never writes to the
+ * SVG sources.
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -34,7 +32,7 @@ const DISHES = [
   { id: "negitoro", sourceName: "NEGITORO.svg", mode: "grid" },
   { id: "saba", sourceName: "SABA.svg", mode: "grid" },
   { id: "tako", sourceName: "TAKO.svg", mode: "grid" },
-  { id: "tekka", sourceName: "TEKKAMAKI.svg", mode: "native-no-export-grid" },
+  { id: "tekka", sourceName: "TEKKAMAKI.svg", mode: "native" },
   { id: "uni", sourceName: "UNI.svg", mode: "grid" },
 ];
 
@@ -144,40 +142,20 @@ function rasterizeGrid(sourceName, svg) {
   return { width, height, image: png(width, height, rgba) };
 }
 
-function exportGridBoundary(entries, width, height) {
-  const expected = width / CELL * (height / CELL);
-  const firstForeground = entries.findIndex(({ attributes: rect }) => rect.width !== "10" || rect.height !== "10");
-  const background = entries.slice(0, firstForeground === -1 ? entries.length : firstForeground);
-  if (!Number.isInteger(expected) || background.length < expected || background.length > expected + 1) return undefined;
-  const cells = new Set();
-  for (const { attributes: rect } of background) {
-    const x = Number(rect.x ?? 0), y = Number(rect.y ?? 0);
-    const column = Math.round(x / CELL), row = Math.round(y / CELL);
-    if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x - column * CELL) > .25 || Math.abs(y - row * CELL) > .25 || column < 0 || column >= width / CELL || row < 0 || row >= height / CELL) return undefined;
-    cells.add(`${column},${row}`);
-  }
-  return cells.size === expected ? background.length : undefined;
-}
-
 function nativeCoordinate(value, sourceName, attribute) {
   const number = Number(value);
   if (!Number.isFinite(number)) throw new Error(`${sourceName}: invalid ${attribute}`);
   return number;
 }
 
-function rasterizeNativeWithoutExportGrid(sourceName, svg) {
+function rasterizeNative(sourceName, svg) {
   const { width, height } = viewBox(sourceName, svg);
   const sourceRects = rects(svg);
-  const gridBoundary = exportGridBoundary(sourceRects, width, height);
-  if (gridBoundary === undefined) throw new Error(`${sourceName}: expected a complete 10px export-grid background`);
-  if (sourceRects.slice(gridBoundary).some(({ attributes: rect }) => rect.class === "cls-3")) throw new Error(`${sourceName}: cls-3 is not confined to the verified export grid`);
   const fills = cssFills(svg), rgba = Buffer.alloc(width * height * 4);
-  // The first 32×24 cells (plus one exporter duplicate within .25px) enumerate
-  // every viewport cell. Only their cls-3 gray cells are the Illustrator canvas
-  // grid; the black outlines and blue plate in that same layer are foreground.
-  for (const [index, entry] of sourceRects.entries()) {
+  // Retain every painted source rect in painter order. Strokes are deliberately
+  // ignored so the exported .25px grid lines cannot introduce anti-aliasing.
+  for (const entry of sourceRects) {
     const rect = entry.attributes;
-    if (index < gridBoundary && rect.class === "cls-3") continue;
     if (!rect.width || !rect.height) throw new Error(`${sourceName}: rect attributes are incomplete`);
     const color = hexColor(fillFor(rect, fills), sourceName);
     if (!color) continue;
@@ -193,7 +171,7 @@ function rasterizeNativeWithoutExportGrid(sourceName, svg) {
 
 function rasterize(sourceName, svg, mode) {
   if (mode === "grid") return rasterizeGrid(sourceName, svg);
-  if (mode === "native-no-export-grid") return rasterizeNativeWithoutExportGrid(sourceName, svg);
+  if (mode === "native") return rasterizeNative(sourceName, svg);
   throw new Error(`${sourceName}: unsupported raster mode ${mode}`);
 }
 
