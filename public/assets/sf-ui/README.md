@@ -9,7 +9,7 @@ The gameplay PNGs were cropped from `/Users/tah/Downloads/2026_SF_game-ui.ai`; r
 | `lantern-left.png` / `lantern-right.png` | 150x185 | Fixed side lantern decorations; the 寿 character is static reference art |
 | `conveyor-strip.png` | 70x195 | Navy conveyor-lane texture and white chevron ornament; tile horizontally |
 | `wave-corner.png` | 250x150 | White seigaiha corner ornament behind the letter row |
-| `sushi-maguro.png` | 245x155 | Static pixel maguro reference art for the ticket/featured dish |
+| `sushi-maguro.png` | 245x155 | Preserved source crop from the supplied UI reference; not loaded by the game (only supplied sushi-pixel assets are shown) |
 | `hourglass.png` | 86x105 | Pixel hourglass icon for the remaining-time HUD; crop includes the red HUD backing |
 | `plate-stack.png` | 125x90 | Pixel plate-stack icon for the dish-count HUD; crop includes the cream HUD backing |
 | `pose-guide-panel.png` | 490x220 | Blank cream inner surface for the sample-pose panel |

@@ -1,25 +1,20 @@
-# Generated game artwork
+# Game artwork provenance
 
-Generated with the built-in `image_gen` tool for this project. Both images retain transparent RGBA backgrounds. These are original game assets, not assets copied from another game.
+## Supplied pixel-art sushi
 
-## Supplied pixel-art sushi SVGs
+`public/assets/sushi-svg/` retains the nine user-supplied SVG source files byte-for-byte: `AKAGAI.svg`, `BINCHOUMAGURO.svg`, `EBI.svg`, `HOTATE.svg`, `IKURA.svg`, `NEGITORO.svg`, `SABA.svg`, `TAKO.svg`, and `UNI.svg`.
 
-The following source files were supplied for this project and are retained byte-for-byte in `public/assets/sushi-svg/`. They are selected only by the exact playable dish ID/romaji filename; they already include their own blue-rimmed plate, so the Canvas renderer does not add a second plate.
+The Canvas runtime uses the corresponding files in `public/assets/sushi-pixel/` instead of drawing the SVGs directly. Each is a deterministic 32px-wide PNG derived from the source's painted 10×10 cells: 32×24 for AKAGAI, BINCHOUMAGURO, EBI, HOTATE, SABA, and TAKO; 32×30 for IKURA, NEGITORO, and UNI. This removes exporter-inserted fractional grid offsets and .25px strokes that could create anti-aliased seams at small Canvas sizes. The original opaque black cells remain black; pixels are otherwise fully transparent or fully opaque.
 
-- `AKAGAI.svg`, `BINCHOUMAGURO.svg`, `EBI.svg`, `HOTATE.svg`, `IKURA.svg`, `NEGITORO.svg`, `SABA.svg`, `TAKO.svg`, and `UNI.svg`: preferred artwork for the matching `akagai`, `binchoumaguro`, `ebi`, `hotate`, `ikura`, `negitoro`, `saba`, `tako`, and `uni` dishes. HOTATE is now a playable `ほたて` dish and begins with the H pose; BINCHOUMAGURO is a playable `びんちょうまぐろ` dish and includes the C pose.
+Regenerate or validate the checked-in renderings with:
 
-The 320 × 240 files and the taller 320 × 300 IKURA/UNI files are drawn with aspect-ratio-preserving contain sizing inside the established sprite envelope. Pending or failed SVG loads retain the existing PNG-atlas and vector fallbacks.
+```sh
+node scripts/generate-sushi-pixel-assets.mjs
+node scripts/generate-sushi-pixel-assets.mjs --check
+```
 
-## Saved assets
+`manifest.json` records each unchanged SVG source SHA-256 and native output dimensions. The generator does not modify the source SVGs.
 
-- `public/assets/sushi-atlas-v2.png`: 1774 x 887, four columns by two rows. MAGURO, TAMAGO, EBI, IKA / IKURA, UNI, TAKO, SABA.
-- `public/assets/sushi-atlas-extra-v1.png`: 1536 x 1024, six columns by four rows. The 24 dishes in `SUSHI_WORDS.slice(8)` order: SAKE, ANAGO, TAI, KATSUO, BURI, KAREI / ISAKI, AKAGAI, MIRUGAI, TORIGAI, KANI, KURUMAEBI / AMAEBI, BOTANEBI, NAMAKO, UMEMAKI, TEKKAMAKI, NATTOMAKI / INARI, TOBIKO, MASAGO, ABURIMAGURO, OOTORO, NEGITORO. Generated with `image_gen` as a transparent, original 2D hand-painted companion atlas using the same red-rimmed plate treatment as the original eight dishes.
-- `public/assets/title-wordmark-v2.png`: 2172 x 724, original Japanese brush title.
+## Other UI assets
 
-## Sushi atlas prompt
-
-Use case: stylized-concept. Asset type: one production-ready transparent 2D sushi sprite atlas for a Japanese retro browser typing game. Create ONE image as an exact 4-column by 2-row evenly spaced grid on a genuine transparent RGBA background. Desired landscape ratio 2:1. Each of the 8 equal cells contains exactly ONE isolated sushi on a small white ceramic oval plate with a thin vermilion-red double rim. Read order top row: MAGURO tuna nigiri, TAMAGO egg nigiri with nori band, EBI shrimp nigiri, IKA squid nigiri. Bottom row: IKURA salmon roe gunkan, UNI sea urchin gunkan, TAKO octopus nigiri, SABA mackerel nigiri. No text, no labels, no letters, no grid lines, no background or table. Consistent 2D hand-painted Japanese game sprite illustration, appetizing detailed food drawing, crisp dark warm outlines, lush tuna marbling and shrimp banding, distinct translucent seafood, individually suggested rice grains, tiny cel highlights. Shallow side/front three-quarter illustrated view as a flat sprite, NOT a 3D rendered object, NOT isometric, NOT pixel art, NOT geometric placeholder icons. The same plate scale, orientation and light source in every cell. Plate and sushi together occupy the middle 78 percent of each cell width and middle 70 percent height, with generous fully transparent padding on all four sides so runtime can sample each cell separately. Entire sprites remain wholly inside their cells with no crossing or overlap. Premium polished arcade art with warm ivory, vermilion, wasabi olive and deep seaweed black. Only eight plates, each with one sushi. No logos or watermark.
-
-## Title prompt
-
-Use case: logo-brand. Asset type: original transparent 2D title wordmark for a Japanese body-controlled sushi typing browser game. Exact Japanese text only: 「全身寿司打」. Spell five characters exactly in this left-to-right order: 全 身 寿 司 打. Draw one single horizontal line of beautiful bold black sumi ink brush calligraphy, energetic but highly readable Japanese strokes with slight natural ink edge variation, traditional sushi-shop game title feel, balanced compact spacing. Wide composition around 3:1 aspect ratio with transparent padding. Genuine transparent RGBA background. This is a flat 2D brush-lettering graphic, not text on a sign, not on paper, not a 3D render, no perspective or depth, no glow or drop shadow. Pure black ink lettering with a tiny warm vermilion accent stroke under the final character if composition needs it; otherwise no extra imagery. No food, no English, no subtitles, no seal text, no watermark, no borrowed brand. All five characters fully inside the frame, no clipping.
+`title-wordmark-v2.png` and the `sf-ui/` directory are presentation assets from the supplied UI references. The legacy non-pixel sushi atlases are intentionally not shipped or loaded.

@@ -4,7 +4,7 @@ export const POSE_HOLD_MS = 400;
 export const POSE_TEMPLATE_VERSION = "poses-v4";
 
 /** Changing this isolates leaderboards and invalidates previous replay contracts. */
-export const RULES_KEY = `rules-v2|score-v1|words-v3|${POSE_TEMPLATE_VERSION}|60000|0.86|400`;
+export const RULES_KEY = `rules-v2|score-v1|words-v4|${POSE_TEMPLATE_VERSION}|60000|0.86|400`;
 
 /**
  * Event timestamps are relative to a started round. Flooring preserves a legal

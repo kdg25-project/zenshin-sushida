@@ -4,7 +4,7 @@ import { type RomajiLetter, type SushiWord, type SushiWordId, type SushiWordProg
 
 export type MatcherResult = { valid: boolean; accuracy: number; jointScore: number; angleScore: number; pathScore: number; reason?: string; pose?: NormalizedPose };
 export type GameConfig = { durationMs: number; threshold: number; holdMs: number; scoreVersion: string; rulesVersion: string; templateVersion: string; wordVersion: string; maxFrameGapMs: number };
-export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v2", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v3", maxFrameGapMs: 180 };
+export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v2", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v4", maxFrameGapMs: 180 };
 
 const finite = (p: Point | undefined): p is Point => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -84,7 +84,7 @@ export const targetSequence=(seed:number,count=200)=>{
 };
 
 function currentWord(session: GameSession): SushiWord {
-  return sushiWord(session.order[session.wordIndex] ?? "") ?? sushiWord("maguro")!;
+  return sushiWord(session.order[session.wordIndex] ?? "") ?? sushiWord("ebi")!;
 }
 
 function refreshedDeck(session: GameSession, random: () => number): SushiWordId[] {

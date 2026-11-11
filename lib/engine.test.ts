@@ -48,12 +48,12 @@ describe("pose matcher",()=>{
 });
 describe("sushi word catalog",()=>{
  it("contains the canonical dishes, alphabet, and a deterministic balanced deck",()=>{
-  expect(SUSHI_WORDS.find(word=>word.id==="maguro")).toEqual({id:"maguro",name:"まぐろ",romaji:"MAGURO"});
+  expect(SUSHI_WORDS.map(word=>word.id)).toEqual(["ebi","ikura","uni","tako","saba","akagai","negitoro","hotate","binchoumaguro"]);
   expect(new Set(SUSHI_WORDS.flatMap(word=>[...word.romaji]))).toEqual(new Set(ROMAJI_ALPHABET));
   expect(SUSHI_WORDS.find(word=>word.id==="hotate")).toEqual({id:"hotate",name:"ほたて",romaji:"HOTATE"});
   expect(SUSHI_WORDS.find(word=>word.id==="binchoumaguro")).toEqual({id:"binchoumaguro",name:"びんちょうまぐろ",romaji:"BINCHOUMAGURO"});
-  const deck=wordSequence(42,34);expect(deck).toEqual(wordSequence(42,34));expect(new Set(deck).size).toBe(34);
-  const next=wordSequence(42,35);expect(next[33]).not.toBe(next[34]);
+  const deck=wordSequence(42,9);expect(deck).toEqual(wordSequence(42,9));expect(new Set(deck).size).toBe(9);
+  const next=wordSequence(42,10);expect(next[8]).not.toBe(next[9]);
  });
 });
 describe("game engine",()=>{
@@ -63,35 +63,35 @@ describe("game engine",()=>{
  it("resets a hold across mismatch and long frame gaps",()=>{let game=advanceTime(beginPlaying(createSession(),0,rng),3500);game=observe(game,3500,.95,true);game=observe(game,3600,.5,true);for(const at of [3650,3750,3850])game=observe(game,at,.95,true);expect(game.successes).toHaveLength(0);for(const at of [3950,4050])game=observe(game,at,.95,true);expect(game.successes).toHaveLength(1);});
  it("ends at deadline, rejects later scores, and skip resets combo only",()=>{let game=advanceTime(beginPlaying(createSession(),0,rng),3500);for(const at of [3500,3600,3700,3800,3900])game=observe(game,at,.95,true);expect(game.combo).toBe(1);const score=game.score;game={...game,combo:3}; const before=game.score;game={...game,status:"playing"}; game=observe(game,(game.startedAt??0)+60_000,.99,true);expect(game.status).toBe("result");expect(game.score).toBe(before);expect(score).toBeGreaterThan(0);});
  it("keeps a legal sub-millisecond final solve below the exclusive deadline",()=>{
-  let game:GameSession={...createSession(),status:"playing",startedAt:0,order:["maguro","tamago"],wordIndex:0,letterIndex:0,targetIndex:0};
+  let game:GameSession={...createSession(),status:"playing",startedAt:0,order:["ebi","uni"],wordIndex:0,letterIndex:0,targetIndex:0};
   for(const at of [59599.6,59699.6,59799.6,59899.6,59999.6]) game=observe(game,at,.95,true);
   expect(game.successes).toHaveLength(1);expect(serializeRelativeEventTime(game.successes[0].at,game.startedAt!)).toBe(59_999);
-  let deadline:GameSession={...createSession(),status:"playing",startedAt:0,order:["maguro","tamago"],wordIndex:0,letterIndex:0,targetIndex:0};
+  let deadline:GameSession={...createSession(),status:"playing",startedAt:0,order:["ebi","uni"],wordIndex:0,letterIndex:0,targetIndex:0};
   for(const at of [59600,59700,59800,59900]) deadline=observe(deadline,at,.95,true);
   deadline=observe(deadline,60_000,.95,true);
   expect(deadline.status).toBe("result");expect(deadline.successes).toHaveLength(0);
  });
- it("requires all six MAGURO letters before completing its plate",()=>{
-  let game=advanceTime({...beginPlaying(createSession(),0,rng),order:["maguro","tamago"],wordIndex:0,letterIndex:0,targetIndex:0},3500);
-  for(const [index,letter] of [..."MAGURO"].entries()){
-   expect(currentWordProgress(game)).toMatchObject({word:{id:"maguro",romaji:"MAGURO"},wordIndex:0,letterIndex:index});
+ it("requires all EBI letters before completing its plate",()=>{
+  let game=advanceTime({...beginPlaying(createSession(),0,rng),order:["ebi","uni"],wordIndex:0,letterIndex:0,targetIndex:0},3500);
+  for(const [index,letter] of [..."EBI"].entries()){
+   expect(currentWordProgress(game)).toMatchObject({word:{id:"ebi",romaji:"EBI"},wordIndex:0,letterIndex:index});
    expect(currentTemplate(game).id).toBe(letter);
    game=solveLetter(game,3500+index*500);
-   expect(completedPlates(game)).toBe(index===5?1:0);
+   expect(completedPlates(game)).toBe(index===2?1:0);
   }
-  expect(game.successes).toHaveLength(6);expect(gameResult(game)).toMatchObject({solved:6,completedPlates:1});
-  expect(currentWordProgress(game)).toMatchObject({word:{id:"tamago"},wordIndex:1,letterIndex:0});
-  expect(upcomingWords(game,1)).toEqual([expect.objectContaining({id:"maguro"})]);
+  expect(game.successes).toHaveLength(3);expect(gameResult(game)).toMatchObject({solved:3,completedPlates:1});
+  expect(currentWordProgress(game)).toMatchObject({word:{id:"uni"},wordIndex:1,letterIndex:0});
+  expect(upcomingWords(game,1)).toEqual([expect.objectContaining({id:"ebi"})]);
  });
  it("skips the remaining dish without erasing awarded letters or creating a plate",()=>{
-  let game=advanceTime({...beginPlaying(createSession(),0,rng),order:["maguro","tamago"],wordIndex:0,letterIndex:0,targetIndex:0},3500);
+  let game=advanceTime({...beginPlaying(createSession(),0,rng),order:["ebi","uni"],wordIndex:0,letterIndex:0,targetIndex:0},3500);
   game=solveLetter(game,3500);game=solveLetter(game,4000);
   expect(game.successes).toHaveLength(2);const score=game.score;
   game=skipTarget(game,5000);
   expect(game.score).toBe(score);expect(game.combo).toBe(0);expect(completedPlates(game)).toBe(0);
-  expect(currentWordProgress(game)).toMatchObject({word:{id:"tamago"},wordIndex:1,letterIndex:0});
-  expect(game.events.at(-1)).toMatchObject({kind:"skip",wordId:"maguro",letterIndex:2,targetIndex:2});
-  expect(game.targetIndex).toBe(6);
+  expect(currentWordProgress(game)).toMatchObject({word:{id:"uni"},wordIndex:1,letterIndex:0});
+  expect(game.events.at(-1)).toMatchObject({kind:"skip",wordId:"ebi",letterIndex:2,targetIndex:2});
+  expect(game.targetIndex).toBe(3);
  });
  it("keeps repeated dishes and boundary letters distinct",()=>{
   let game=advanceTime({...beginPlaying(createSession(),0,rng),order:["saba","saba"],wordIndex:0,letterIndex:0,targetIndex:0},3500);

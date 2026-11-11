@@ -157,8 +157,7 @@ function drawLane(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefi
   const ticket = portrait ? {x:68,y:154,width:464,height:134}:desktopScene.ticket;
   pixelFrame(ctx,ticket,"#fde0b4","#eb1f16",10);ctx.fillStyle="#c70d08";ctx.fillRect(ticket.x+15,ticket.y+15,ticket.width*.36,ticket.height-30);
   const bob = animate ? Math.sin(time / 390) * 2 : 0;
-  if (!portrait && hero.id === "maguro" && drawable(reference?.maguro)) drawImage(ctx, reference?.maguro, { x:ticket.x + 15, y:ticket.y + 16 + bob, width:ticket.width*.36, height:ticket.height - 32 });
-  else drawSushiPlate(ctx, assets, hero.id, ticket.x + ticket.width*.19, ticket.y + ticket.height*.57 + bob, portrait ? 150 : 194, true);
+  drawSushiPlate(ctx, assets, hero.id, ticket.x + ticket.width*.19, ticket.y + ticket.height*.57 + bob, portrait ? 150 : 194, true);
   const ticketText = ticketTextSlot(ticket);
   const ticketCenter = ticketText.x + ticketText.width / 2;
   fittedText(ctx, hero.name, ticketCenter, ticket.y + ticket.height * .47, portrait ? 34 : 46, portrait ? 22 : 28, ticketText.width, "#08090b", pixelFont);
@@ -193,7 +192,7 @@ function drawMenu(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefi
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH;
   const sign = portrait ? { x:55,y:58,width:490,height:130 } : { x:282,y:34,width:636,height:150 };
   pixelFrame(ctx,sign,"#fde0b4","#ea241b",10);ctx.fillStyle="#bf180f";ctx.fillRect(sign.x+18,sign.y+18,sign.width*.28,sign.height-36);
-  drawSushiPlate(ctx,assets,"maguro",sign.x+sign.width*.16,sign.y+sign.height*.54,portrait?138:176,true);
+  drawSushiPlate(ctx,assets,"ebi",sign.x+sign.width*.16,sign.y+sign.height*.54,portrait?138:176,true);
   text(ctx,"全身寿司打",sign.x+sign.width*.67,sign.y+sign.height*.46,portrait?40:56,"#08090b","center",pixelFont);
   text(ctx,"からだで にぎる 60秒",sign.x+sign.width*.67,sign.y+sign.height*.76,portrait?15:20,"#8b6244","center",pixelFont);
   text(ctx, "ランキング名（デモは空欄でもOK）", rects.name.x, rects.name.y - 25, portrait ? 20 : 17, "#fff5d8");

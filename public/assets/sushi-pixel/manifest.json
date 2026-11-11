@@ -1,0 +1,65 @@
+{
+  "akagai": {
+    "source": "AKAGAI.svg",
+    "sourceSha256": "ccc6fd7ded7deacf6e966893cdac3f178e6d5f64bc1b24d560c21336dbf9c2e9",
+    "width": 32,
+    "height": 24,
+    "alpha": "opaque-or-transparent"
+  },
+  "binchoumaguro": {
+    "source": "BINCHOUMAGURO.svg",
+    "sourceSha256": "e05aaa42b8684abdc3b3b118cff65f404f0f26f16ee8f0cbbf9cb0cfc10ceea2",
+    "width": 32,
+    "height": 24,
+    "alpha": "opaque-or-transparent"
+  },
+  "ebi": {
+    "source": "EBI.svg",
+    "sourceSha256": "27fa98f0d5852fb2c7dc11196ff2758895f30bef773cf30575eae8cb1ab9b768",
+    "width": 32,
+    "height": 24,
+    "alpha": "opaque-or-transparent"
+  },
+  "hotate": {
+    "source": "HOTATE.svg",
+    "sourceSha256": "fbfac03cbcc3d1a4690a3009db2f7e2ed908766d3052c3e809d7053a0f456652",
+    "width": 32,
+    "height": 24,
+    "alpha": "opaque-or-transparent"
+  },
+  "ikura": {
+    "source": "IKURA.svg",
+    "sourceSha256": "2dc615138ebf502208b9e05959b99fe3ba16fc67b1ebca3c89f358878aff7383",
+    "width": 32,
+    "height": 30,
+    "alpha": "opaque-or-transparent"
+  },
+  "negitoro": {
+    "source": "NEGITORO.svg",
+    "sourceSha256": "3afe7f801076843c55db45114e301c4b497dc1a8614a6b413ccc3bb7b3a49bb6",
+    "width": 32,
+    "height": 30,
+    "alpha": "opaque-or-transparent"
+  },
+  "saba": {
+    "source": "SABA.svg",
+    "sourceSha256": "0dc7acf13f1082ecd2f5a29e6845fceab2796dc9172d02990fdbfbbd14355dd6",
+    "width": 32,
+    "height": 24,
+    "alpha": "opaque-or-transparent"
+  },
+  "tako": {
+    "source": "TAKO.svg",
+    "sourceSha256": "a7a0c3490691f62994b872e5007619a6d20549a9bf088f054f06d03949a210b4",
+    "width": 32,
+    "height": 24,
+    "alpha": "opaque-or-transparent"
+  },
+  "uni": {
+    "source": "UNI.svg",
+    "sourceSha256": "eaf25527e20cece930ba239072bec36e766c9caf19dfc11457521118a66de6f8",
+    "width": 32,
+    "height": 30,
+    "alpha": "opaque-or-transparent"
+  }
+}

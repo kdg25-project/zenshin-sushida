@@ -1,11 +1,11 @@
 /** Presentation-only crops from the supplied Illustrator reference. */
-export type SfUiAssets = Partial<Record<"topWood" | "counterWood" | "lanternLeft" | "lanternRight" | "conveyor" | "wave" | "maguro" | "hourglass" | "plateStack" | "poseGuide" | "poseCamera" | "rankingTitle" | "rankingBack" | "rankingRefresh" | "rankingPagerNormal" | "rankingPagerSelected" | "rankingPagerPrevious" | "rankingPagerNext" | "rankingRankBadge" | "rankingCrownOne" | "rankingCrownTwo" | "rankingCrownThree", HTMLImageElement>>;
+export type SfUiAssets = Partial<Record<"topWood" | "counterWood" | "lanternLeft" | "lanternRight" | "conveyor" | "wave" | "hourglass" | "plateStack" | "poseGuide" | "poseCamera" | "rankingTitle" | "rankingBack" | "rankingRefresh" | "rankingPagerNormal" | "rankingPagerSelected" | "rankingPagerPrevious" | "rankingPagerNext" | "rankingRankBadge" | "rankingCrownOne" | "rankingCrownTwo" | "rankingCrownThree", HTMLImageElement>>;
 
 const sources = {
   topWood: "/assets/sf-ui/top-wood.png", counterWood: "/assets/sf-ui/counter-wood.png",
   lanternLeft: "/assets/sf-ui/lantern-left.png", lanternRight: "/assets/sf-ui/lantern-right.png",
   conveyor: "/assets/sf-ui/conveyor-strip.png", wave: "/assets/sf-ui/wave-corner.png",
-  maguro: "/assets/sf-ui/sushi-maguro.png", hourglass: "/assets/sf-ui/hourglass.png",
+  hourglass: "/assets/sf-ui/hourglass.png",
   plateStack: "/assets/sf-ui/plate-stack.png", poseGuide: "/assets/sf-ui/pose-guide-panel.png", poseCamera: "/assets/sf-ui/pose-camera-panel.png",
   rankingTitle: "/assets/sf-ui/ranking-title.png", rankingBack: "/assets/sf-ui/ranking-back.png", rankingRefresh: "/assets/sf-ui/ranking-refresh.png",
   rankingPagerNormal: "/assets/sf-ui/ranking-pager-normal.png", rankingPagerSelected: "/assets/sf-ui/ranking-pager-selected.png",
