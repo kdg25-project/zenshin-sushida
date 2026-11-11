@@ -1,4 +1,6 @@
 export const GAME_DURATION_MS = 60_000;
+/** New leaderboard rows may be registered for fifteen minutes; authenticated saved-result receipts do not expire. */
+export const RANKING_SUBMISSION_TTL_MS = 15 * 60_000;
 export const POSE_THRESHOLD = .75;
 /** A score alone is insufficient when two ROMAJI silhouettes are near-identical. */
 export const POSE_MATCH_MARGIN = .05;

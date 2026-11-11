@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CameraController } from "../lib/camera-controller";
 import { DEFAULT_CONFIG, advanceTime, beginPlaying, completedPlates, createSession, currentTemplate, currentWordProgress, gameResult, matchPose, matchTargetPose, observe, skipTarget, smoothPose, syntheticLandmarks, upcomingWords, wordSequence, type GameSession } from "../lib/engine";
-import { RULES_KEY, serializeRelativeEventTime } from "../lib/game-rules";
+import { RULES_KEY } from "../lib/game-rules";
 import { formatStoredRankingAccuracy, isPlayReady, StartAttemptGate } from "../lib/game-ui";
+import { classifyRankingSubmitResponse, createRankingSubmission, RankSubmitAttemptGate, type RankSession } from "../lib/ranking-submission";
 import { normalizePlayerName, playerNameError, PLAYER_NAME_MAX_LENGTH } from "../lib/player";
 import { POSE_TEMPLATES, type Landmark, type NormalizedPose, type PoseTemplate } from "../lib/pose";
 import { projectCameraLandmark, projectTargetPosePoint } from "../lib/skeleton-projection";
@@ -14,7 +15,6 @@ import { leavePresentationToMenu } from "../lib/presentation-session";
 import { GameCanvas } from "./GameCanvas";
 import { PoseListDialog } from "./PoseListDialog";
 
-type RankSession = { id: string; token: string; seed: number } | undefined;
 type RankEntry = { playerName: string; score: number; solved: number; maxCombo: number; averageAccuracy: number; createdAt: number };
 type RoundIdentity = { name: string; rankingEligible: boolean; practice: boolean } | undefined;
 const BONES: [number, number][] = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
@@ -50,7 +50,7 @@ export default function GameClient() {
   const [view,setView] = useState<"menu"|"game"|"ranking">("menu");
   const [poseListOpen,setPoseListOpen] = useState(false);
   const [displayLandmarks,setDisplayLandmarks] = useState<Landmark[]|undefined>();
-  const sessionRef=useRef(session), rankStartGateRef=useRef(new StartAttemptGate()), rankRequestRef=useRef(0);
+  const sessionRef=useRef(session), rankStartGateRef=useRef(new StartAttemptGate()), rankSubmitGateRef=useRef(new RankSubmitAttemptGate()), rankRequestRef=useRef(0);
   const videoRef=useRef<HTMLVideoElement>(null), canvasRef=useRef<HTMLCanvasElement>(null), landmarkerRef=useRef<any>(undefined), rafRef=useRef<number|undefined>(undefined), smootherRef=useRef<NormalizedPose|undefined>(undefined), cameraControllerRef=useRef<CameraController<MediaStream,any>|undefined>(undefined);
   const calibrationSince=useRef<number|undefined>(undefined), lastInference=useRef(0);
   const update=useCallback((next:GameSession)=>{sessionRef.current=next;setSession(next);},[]);
@@ -80,7 +80,7 @@ export default function GameClient() {
     cameraControllerRef.current=controller;await controller.start();if(cameraControllerRef.current===controller)setCameraStarting(false);
   },[applyFrame,cameraStarting,cleanupCamera,draw,isActive,resetCameraReadiness,simulation]);
 
-  useEffect(()=>()=>{rankStartGateRef.current.cancel();cleanupCamera();},[cleanupCamera]);
+  useEffect(()=>()=>{rankStartGateRef.current.cancel();rankSubmitGateRef.current.cancel();cleanupCamera();},[cleanupCamera]);
   useEffect(()=>{const onVisibility=()=>{if(document.hidden&&sessionRef.current.status==="playing")update(observe(sessionRef.current,performance.now(),0,false));};document.addEventListener("visibilitychange",onVisibility);return()=>document.removeEventListener("visibilitychange",onVisibility);},[update]);
   useEffect(()=>{if(session.status!=="countdown"&&session.status!=="playing")return;const id=window.setInterval(()=>setNow(performance.now()),80);return()=>window.clearInterval(id);},[session.status]);
   useEffect(()=>{try{setRankName(localStorage.getItem("zenshin-sushida-player-name")??"");}catch{}},[]);
@@ -94,23 +94,25 @@ export default function GameClient() {
     if(!simulation&&nameError){setRankError(nameError);return;}
     const request=rankStartGateRef.current.begin();
     if(request===undefined)return;
-    setRankStarting(true);setRankError(undefined);setRankMessage("");setRankSession(undefined);
-    let freshRank:RankSession;
+    rankSubmitGateRef.current.cancel();setRankStarting(true);setRankError(undefined);setRankMessage("");setRankSession(undefined);
+    let freshRank:RankSession | undefined;
     if(!simulation)try{const response=await fetch("/api/games",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({rulesKey:RULES_KEY,simulation:false})});if(!response.ok)throw new Error();freshRank=await response.json();}catch{if(rankStartGateRef.current.isCurrent(request))setRankMessage("ランキング用ゲームを開始できませんでした。今回はランキング対象外で遊べます。");}
     if(!rankStartGateRef.current.isCurrent(request))return;
     const next=beginPlaying(sessionRef.current,performance.now());update(freshRank?{...next,order:wordSequence(freshRank.seed)}:next);setRankSession(freshRank);setRoundIdentity({name:playerName,rankingEligible:!!freshRank,practice:simulation});if(rankStartGateRef.current.finish(request))setRankStarting(false);
   };
   const submitRank=async()=>{
-    if(!rankSession||!roundIdentity?.rankingEligible||roundIdentity.practice||session.status!=="result"||submitting)return;
+    if(!rankSession||!roundIdentity?.rankingEligible||roundIdentity.practice||session.status!=="result")return;
+    const request=rankSubmitGateRef.current.begin();
+    if(request===undefined)return;
     setSubmitting(true);setRankError(undefined);setRankMessage("ランキングへ登録中…");
-    try{const startAt=session.startedAt??session.endedAt??0,response=await fetch(`/api/games/${rankSession.id}/submit`,{method:"POST",headers:{"content-type":"application/json","x-game-token":rankSession.token},body:JSON.stringify({name:roundIdentity.name,simulation:false,rulesKey:RULES_KEY,events:session.events.map(event=>({...event,at:serializeRelativeEventTime(event.at,startAt)}))})}),data=await response.json();if(!response.ok)throw new Error(data.error??"登録に失敗しました");setRankMessage("ランキングに登録しました。最新の番付を更新しました。");setRankSession(undefined);await fetchRanks();}catch(error){setRankMessage(error instanceof Error?error.message:"通信エラーで登録できませんでした");}finally{setSubmitting(false);}
+    try{const response=await fetch(`/api/games/${rankSession.id}/submit`,{method:"POST",headers:{"content-type":"application/json","x-game-token":rankSession.token},body:JSON.stringify(createRankingSubmission(roundIdentity.name,session,RULES_KEY))}),data=await response.json().catch(()=>undefined),outcome=classifyRankingSubmitResponse(response.ok,data);if(!rankSubmitGateRef.current.isCurrent(request))return;if(outcome.kind==="terminal"){setRankMessage(outcome.message);setRankSession(undefined);return;}if(outcome.kind==="retryable")throw new Error(outcome.message);setRankMessage(outcome.receipt.alreadyRegistered===true?"この結果はすでにランキングへ登録されています。":"ランキングに登録しました。最新の番付を更新しました。");setRankSession(undefined);void fetchRanks();}catch(error){if(rankSubmitGateRef.current.isCurrent(request))setRankMessage(error instanceof Error?error.message:"通信エラーで登録できませんでした。もう一度お試しください。");}finally{if(rankSubmitGateRef.current.finish(request))setSubmitting(false);}
   };
-  const reset=()=>{rankStartGateRef.current.cancel();setRankStarting(false);setRankSession(undefined);setRoundIdentity(undefined);setRankMessage("");setRankError(undefined);setSubmitting(false);update(createSession());};
-  const toggleSimulation=(checked:boolean)=>{if(!canChangeMode)return;rankStartGateRef.current.cancel();setRankStarting(false);cleanupCamera();resetCameraReadiness(checked?"自動デモ：ランキング対象外":"カメラを開始して全身を映してください");setCameraStarting(false);setSimulation(checked);setRankSession(undefined);setRoundIdentity(undefined);setRankMessage("");setRankError(undefined);};
-  const prepareMode=(practice:boolean)=>{rankStartGateRef.current.cancel();setRankStarting(false);cleanupCamera();resetCameraReadiness(practice?"自動デモ：ランキング対象外":"カメラを開始して全身を映してください");setCameraStarting(false);setSimulation(practice);setRankSession(undefined);setRoundIdentity(undefined);setRankMessage("");setRankError(undefined);setSubmitting(false);update(createSession());setView("game");};
+  const reset=()=>{rankStartGateRef.current.cancel();rankSubmitGateRef.current.cancel();setRankStarting(false);setRankSession(undefined);setRoundIdentity(undefined);setRankMessage("");setRankError(undefined);setSubmitting(false);update(createSession());};
+  const toggleSimulation=(checked:boolean)=>{if(!canChangeMode)return;rankStartGateRef.current.cancel();rankSubmitGateRef.current.cancel();setRankStarting(false);cleanupCamera();resetCameraReadiness(checked?"自動デモ：ランキング対象外":"カメラを開始して全身を映してください");setCameraStarting(false);setSimulation(checked);setRankSession(undefined);setRoundIdentity(undefined);setRankMessage("");setRankError(undefined);};
+  const prepareMode=(practice:boolean)=>{rankStartGateRef.current.cancel();rankSubmitGateRef.current.cancel();setRankStarting(false);cleanupCamera();resetCameraReadiness(practice?"自動デモ：ランキング対象外":"カメラを開始して全身を映してください");setCameraStarting(false);setSimulation(practice);setRankSession(undefined);setRoundIdentity(undefined);setRankMessage("");setRankError(undefined);setSubmitting(false);update(createSession());setView("game");};
   const openCamera=()=>prepareMode(false);
   const openPractice=()=>prepareMode(true);
-  const backToMenu=()=>leavePresentationToMenu({cancelStart:()=>{rankStartGateRef.current.cancel();setRankStarting(false);},stopCamera:cleanupCamera,resetReadiness:resetCameraReadiness,setCameraStarting,setView},simulation?"自動デモ：ランキング対象外":"カメラを開始して全身を映してください");
+  const backToMenu=()=>{rankSubmitGateRef.current.cancel();setSubmitting(false);leavePresentationToMenu({cancelStart:()=>{rankStartGateRef.current.cancel();setRankStarting(false);},stopCamera:cleanupCamera,resetReadiness:resetCameraReadiness,setCameraStarting,setView},simulation?"自動デモ：ランキング対象外":"カメラを開始して全身を映してください");};
   const lastSuccess=session.successes.at(-1), countdown=session.status==="countdown"?Math.max(1,Math.ceil(((session.countdownUntil??now)-now)/1000)):0;
 
   return <><GameCanvas view={view} session={session} target={target} wordProgress={wordProgress} upcomingWords={nextWords} completedPlates={platesCompleted} remaining={remaining} hold={hold} displayName={displayName} playerName={playerName} nameError={nameError} rankName={rankName} simulation={simulation} rankingEligible={!!rankSession&&!!roundIdentity?.rankingEligible} cameraCalibrated={cameraCalibrated} cameraStarting={cameraStarting} cameraMessage={cameraMessage} landmarks={displayLandmarks} ranking={ranking} rankingStatus={rankingStatus} rankingPage={rankingPage} rankMessage={rankMessage} rankError={rankError} submitting={submitting} videoRef={videoRef} poseCanvasRef={canvasRef} onNameChange={value=>{setRankName(value);setRankError(undefined);}} onOpenCamera={openCamera} onPractice={openPractice} onRankings={()=>{setView("ranking");void fetchRanks();}} onOpenPoseList={()=>setPoseListOpen(true)} onBackMenu={backToMenu} onStartCamera={()=>void startCamera()} onStart={start} onSkip={()=>update(skipTarget(sessionRef.current,performance.now()))} onRegister={submitRank} onRetry={()=>{reset();setView("game");}} onFetchRanks={fetchRanks} onRankingPage={page=>setRankingPage(Math.max(0,Math.min(3,page)))}/><PoseListDialog open={poseListOpen} onClose={()=>setPoseListOpen(false)}/><div hidden className="legacy-ui"><main className="sushi-app">

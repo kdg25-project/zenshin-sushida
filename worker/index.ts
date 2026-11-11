@@ -1,4 +1,5 @@
-import { GAME_DURATION_MS, POSE_HOLD_MS, POSE_THRESHOLD, RULES_KEY } from "../lib/game-rules";
+import { GAME_DURATION_MS, POSE_HOLD_MS, POSE_THRESHOLD, RANKING_SUBMISSION_TTL_MS, RULES_KEY } from "../lib/game-rules";
+import { type RankingReceipt, type RankingSubmitCode } from "../lib/ranking-submission";
 import { sushiWord, wordSequence, type SushiWordId } from "../lib/sushi-words";
 
 type D1Result = { meta?: { changes?: number } };
@@ -9,12 +10,18 @@ export interface Env { DB: D1Database; ASSETS: Fetcher }
 
 type Event = { kind: "solve" | "skip"; targetIndex: number; templateId: string; wordId: SushiWordId; wordIndex: number; letterIndex: number; at: number; accuracy?: number };
 type ReplayResult = { score: number; solved: number; completedPlates: number; maxCombo: number; avg: number };
+type AuthenticatedSession = { rules_key: string; target_seed: number; started_at: number; consumed_at: number | null };
+type StoredRankingReceipt = { score: number; solved: number; maxCombo: number; averageAccuracy: number };
 
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const hash=async(input:string)=>{const data=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(input));return [...new Uint8Array(data)].map(value=>value.toString(16).padStart(2,"0")).join("");};
 const rulesKey=(input:unknown)=> input===RULES_KEY;
 const read=async<T>(request:Request):Promise<T|undefined>=>{try{return await request.json() as T}catch{return undefined}};
 const scoreFor=(accuracy:number,combo:number)=>Math.round(100+accuracy*100+Math.min(combo,20)*12);
+const submissionError=(code:RankingSubmitCode,status=409)=>json({code,error:"このゲーム結果は登録できません"},status);
+const receiptResponse=(receipt:StoredRankingReceipt):RankingReceipt=>({score:receipt.score,solved:receipt.solved,maxCombo:receipt.maxCombo,averageAccuracy:receipt.averageAccuracy/10_000,alreadyRegistered:true});
+const replayReceipt=(scoring:ReplayResult):RankingReceipt=>({score:scoring.score,solved:scoring.solved,maxCombo:scoring.maxCombo,averageAccuracy:scoring.avg/10_000});
+const findReceipt=(env:Env,sessionId:string)=>env.DB.prepare("SELECT score, solved, max_combo as maxCombo, average_accuracy as averageAccuracy FROM leaderboard_entries WHERE session_id=?").bind(sessionId).first<StoredRankingReceipt>();
 
 /** Replays only client events; aggregate claims are never trusted. */
 function validateEvents(value:unknown, seed:number): ReplayResult|undefined {
@@ -57,17 +64,28 @@ async function api(request:Request, env:Env){
   if(match&&request.method==="POST"){
     const body=await read<{name?:unknown;events?:unknown;rulesKey?:unknown;simulation?:unknown}>(request);
     const token=request.headers.get("x-game-token");
-    if(!body||typeof body.name!=="string"||body.name.trim().length<1||body.name.trim().length>20||!rulesKey(body.rulesKey)||body.simulation===true||!token)return json({error:"送信内容が不正です"},400);
+    if(!body||typeof body.name!=="string"||body.name.trim().length<1||body.name.trim().length>20||body.simulation===true||!token)return json({code:"INVALID_SUBMISSION",error:"送信内容が不正です"},400);
     const now=Date.now(),tokenHash=await hash(token);
-    const session=await env.DB.prepare("SELECT target_seed FROM game_sessions WHERE id=? AND token_hash=? AND rules_key=? AND consumed_at IS NULL AND simulation=0 AND started_at>=?").bind(match[1],tokenHash,RULES_KEY,now-180_000).first<{target_seed:number}>();
-    if(!session)return json({error:"この結果は既に送信済みか無効です"},409);
+    const session=await env.DB.prepare("SELECT rules_key, target_seed, started_at, consumed_at FROM game_sessions WHERE id=? AND token_hash=? AND simulation=0").bind(match[1],tokenHash).first<AuthenticatedSession>();
+    if(!session)return submissionError("INVALID_SESSION");
+    if(session.rules_key!==RULES_KEY||!rulesKey(body.rulesKey))return submissionError("RULES_CHANGED");
+    // A receipt never creates or changes a row. Keep it available after the
+    // new-registration window so a lost successful response remains retryable.
+    const stored=await findReceipt(env,match[1]);
+    if(stored)return json(receiptResponse(stored));
+    if(session.consumed_at!==null)return submissionError("INVALID_SESSION");
+    if(session.started_at<now-RANKING_SUBMISSION_TTL_MS)return submissionError("GAME_EXPIRED");
     const scoring=validateEvents(body.events,session.target_seed);
     if(!scoring)return json({error:"イベント履歴が不正です"},422);
-    const insert=env.DB.prepare("INSERT INTO leaderboard_entries (rules_key,session_id,player_name,score,solved,max_combo,average_accuracy,created_at) SELECT ?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM game_sessions WHERE id=? AND token_hash=? AND rules_key=? AND consumed_at IS NULL AND simulation=0 AND started_at>=?)").bind(RULES_KEY,match[1],body.name.trim(),scoring.score,scoring.solved,scoring.maxCombo,scoring.avg,now,match[1],tokenHash,RULES_KEY,now-180_000);
+    const insert=env.DB.prepare("INSERT INTO leaderboard_entries (rules_key,session_id,player_name,score,solved,max_combo,average_accuracy,created_at) SELECT ?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM game_sessions WHERE id=? AND token_hash=? AND rules_key=? AND consumed_at IS NULL AND simulation=0 AND started_at>=?)").bind(RULES_KEY,match[1],body.name.trim(),scoring.score,scoring.solved,scoring.maxCombo,scoring.avg,now,match[1],tokenHash,RULES_KEY,now-RANKING_SUBMISSION_TTL_MS);
     const consume=env.DB.prepare("UPDATE game_sessions SET consumed_at=? WHERE id=? AND token_hash=? AND consumed_at IS NULL AND EXISTS (SELECT 1 FROM leaderboard_entries WHERE session_id=?)").bind(now,match[1],tokenHash,match[1]);
     const result=await env.DB.batch([insert,consume]);
-    if((result[0].meta?.changes??0)!==1)return json({error:"この結果は既に送信済みか無効です"},409);
-    return json({score:scoring.score,solved:scoring.solved,completedPlates:scoring.completedPlates,maxCombo:scoring.maxCombo,averageAccuracy:scoring.avg/10_000});
+    if((result[0].meta?.changes??0)!==1){
+      const receipt=await findReceipt(env,match[1]);
+      if(receipt)return json(receiptResponse(receipt));
+      return session.started_at<now-RANKING_SUBMISSION_TTL_MS?submissionError("GAME_EXPIRED"):submissionError("INVALID_SESSION");
+    }
+    return json({...replayReceipt(scoring),completedPlates:scoring.completedPlates});
   }
   return env.ASSETS.fetch(request);
 }
