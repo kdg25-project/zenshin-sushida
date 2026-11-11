@@ -1,12 +1,12 @@
 import { type JointName, type Landmark, type NormalizedPose, type Point, INDEX, REQUIRED_JOINTS, POSE_TEMPLATES, type PoseTemplate } from "./pose";
-import { GAME_DURATION_MS, POSE_HOLD_MS, POSE_MATCH_MARGIN, POSE_TEMPLATE_VERSION, POSE_THRESHOLD } from "./game-rules";
+import { GAME_DURATION_MS, POSE_HOLD_MS, POSE_TEMPLATE_VERSION, POSE_THRESHOLD, poseMatchMargin } from "./game-rules";
 import { type RomajiLetter, type SushiWord, type SushiWordId, type SushiWordProgress, seededRandom, shuffledWordIds, sushiWord, wordSequence } from "./sushi-words";
 
 export type MatcherResult = { valid: boolean; accuracy: number; jointScore: number; angleScore: number; pathScore: number; reason?: string; pose?: NormalizedPose };
 /** A valid camera pose may still be too similar to another ROMAJI silhouette to solve. */
 export type GuardedMatcherResult = MatcherResult & { accepted: boolean; nearestTemplateId?: string; margin?: number };
 export type GameConfig = { durationMs: number; threshold: number; holdMs: number; scoreVersion: string; rulesVersion: string; templateVersion: string; wordVersion: string; maxFrameGapMs: number };
-export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v3", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v6", maxFrameGapMs: 180 };
+export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v4", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v6", maxFrameGapMs: 180 };
 
 const finite = (p: Point | undefined): p is Point => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -80,7 +80,7 @@ export function matchTargetPose(actual: NormalizedPose, template: PoseTemplate, 
   if (!target.valid) return { ...target, accepted:false };
   const nearest = POSE_TEMPLATES.filter(candidate=>candidate.id!==template.id).map(candidate=>({ id:candidate.id, score:matchNormalizedPose(actual,candidate).accuracy })).reduce((best,current)=>current.score>best.score?current:best,{id:"",score:-Infinity});
   const margin=target.accuracy-nearest.score;
-  return { ...target, accepted:target.accuracy>=threshold&&margin>=POSE_MATCH_MARGIN, nearestTemplateId:nearest.id||undefined, margin };
+  return { ...target, accepted:target.accuracy>=threshold&&margin>=poseMatchMargin(template.id), nearestTemplateId:nearest.id||undefined, margin };
 }
 
 export type GameStatus = "idle"|"camera-check"|"countdown"|"playing"|"result";
