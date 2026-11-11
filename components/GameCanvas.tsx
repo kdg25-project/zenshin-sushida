@@ -58,8 +58,16 @@ function pixelFrame(ctx: CanvasRenderingContext2D, rect: Rect, fill = "#fde0b4",
 }
 function paper(ctx: CanvasRenderingContext2D, rect: Rect, fill = "#fde0b4") { pixelFrame(ctx, rect, fill, "#33180e", 6); }
 function woodButton(ctx: CanvasRenderingContext2D, rect: Rect, value: string, hot = false, disabled = false) {
-  pixelFrame(ctx, rect, disabled ? "#9f8e72" : hot ? "#b42a20" : "#fde0b4", "#1a0f0b", 6);
+  ctx.save();
+  ctx.fillStyle = "#2b160d";
+  ctx.fillRect(rect.x + 3, rect.y + 4, rect.width, rect.height);
+  ctx.fillStyle = disabled ? "#9f8e72" : hot ? "#b42a20" : "#fde0b4";
+  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  ctx.strokeStyle = "#1a0f0b";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(rect.x + 1.5, rect.y + 1.5, rect.width - 3, rect.height - 3);
   text(ctx, value, rect.x + rect.width / 2, rect.y + rect.height / 2 + 1, rect.height >= 70 ? 25 : 19, disabled ? "#eee4cc" : hot ? "#fff8e6" : "#172a3a", "center", pixelFont);
+  ctx.restore();
 }
 function drawImage(ctx: CanvasRenderingContext2D, image: HTMLImageElement | undefined, rect: Rect) {
   if (drawable(image)) ctx.drawImage(image!, rect.x, rect.y, rect.width, rect.height);
@@ -301,7 +309,7 @@ function drawRanking(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | und
   else rows.forEach((row, index) => rankRow(ctx, reference, row, pageStart + index + 1, table.y + index * table.row, table.x, table.width, table.row - 2, portrait, columns));
   const pages = Math.max(1, Math.min(4, Math.ceil(props.ranking.length / 10))), pageRects = [rects.rankingPage1, rects.rankingPage2, rects.rankingPage3, rects.rankingPage4];
   drawRankingPager(ctx, { previous:rects.rankingPrevious, pages:pageRects, next:rects.rankingNext }, props.rankingPage, pages, props.rankingStatus === "loading", !!props.ranking.length, portrait, digitFont, { pagerNormal:reference?.rankingPagerNormal, pagerSelected:reference?.rankingPagerSelected, pagerPrevious:reference?.rankingPagerPrevious, pagerNext:reference?.rankingPagerNext });
-  if (drawable(reference?.rankingBack) && drawable(reference?.rankingRefresh)) { drawImage(ctx, reference?.rankingBack, rects.rankingBack); ctx.save(); if (props.rankingStatus === "loading") ctx.globalAlpha = .52; drawImage(ctx, reference?.rankingRefresh, rects.rankingRefresh); ctx.restore(); } else { woodButton(ctx, rects.rankingBack, "メニューへ戻る"); woodButton(ctx, rects.rankingRefresh, "ランキングを更新", true, props.rankingStatus === "loading"); }
+  woodButton(ctx, rects.rankingBack, "メニューへ戻る"); woodButton(ctx, rects.rankingRefresh, "ランキングを更新", true, props.rankingStatus === "loading");
 }
 function paintGame(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, reference: SfUiAssets | undefined, props: Props, phase: Phase, portrait: boolean, now: number, animate: boolean) {
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, height = portrait ? PORTRAIT_HEIGHT : GAME_HEIGHT, rects = portrait ? portraitGameRects : gameRects;
