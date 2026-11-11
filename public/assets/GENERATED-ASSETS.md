@@ -2,11 +2,11 @@
 
 ## Supplied pixel-art sushi
 
-`public/assets/sushi-svg/` retains the eleven user-supplied SVG source files byte-for-byte: `AKAGAI.svg`, `BINCHOUMAGURO.svg`, `EBI.svg`, `HOTATE.svg`, `IKURA.svg`, `MAGURO.svg`, `NEGITORO.svg`, `SABA.svg`, `TAKO.svg`, `TEKKAMAKI.svg`, and `UNI.svg`.
+`public/assets/sushi-svg/` retains the twelve user-supplied SVG source files byte-for-byte: `AKAGAI.svg`, `BINCHOUMAGURO.svg`, `EBI.svg`, `HOTATE.svg`, `IKURA.svg`, `MAGURO.svg`, `NAMAEBI.svg`, `NEGITORO.svg`, `SABA.svg`, `TAKO.svg`, `TEKKAMAKI.svg`, and `UNI.svg`.
 
 The Canvas runtime uses the corresponding files in `public/assets/sushi-pixel/` instead of drawing the SVGs directly. Ten 10px-grid sources are deterministic 32px-wide PNGs: 32×24 for AKAGAI, BINCHOUMAGURO, EBI, HOTATE, MAGURO, SABA, and TAKO; 32×30 for IKURA, NEGITORO, and UNI. This removes exporter-inserted fractional grid offsets and .25px strokes that could create anti-aliased seams at small Canvas sizes.
 
-`TEKKAMAKI.svg` has fractional foreground cells. The generator rasterizes every painted cell at native 320×240 source pixels with integer edge rounding, source painter order, SVG's default black fill for stroke-only cells, and no anti-aliasing. This keeps its gray nori, blue plate, and black outlines while ignoring the source's exporter strokes. Every generated PNG is transparent or opaque per pixel; no source SVG is modified.
+`NAMAEBI.svg` and `TEKKAMAKI.svg` use finer source grids. The generator rasterizes every painted cell at native 320×240 source pixels with integer edge rounding, source painter order, SVG's default black fill for stroke-only cells, and no anti-aliasing. This retains their plate and outlines while ignoring the source's exporter strokes. Every generated PNG is transparent or opaque per pixel; no source SVG is modified.
 
 Regenerate or validate the checked-in renderings with:
 

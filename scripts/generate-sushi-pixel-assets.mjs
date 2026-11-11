@@ -8,9 +8,9 @@
  * rasterizing those SVGs at runtime leaves anti-aliased seams between cells.
  * This generator intentionally reads only the filled cell color and painter
  * order, rounds each cell to the source's 10px grid, and writes an opaque-or-
- * transparent PNG. TEKKAMAKI has fractional foreground cells, so it is
- * rasterized at its native 320×240 source resolution. It never writes to the
- * SVG sources.
+ * transparent PNG. NAMAEBI and TEKKAMAKI have finer source grids, so they are
+ * rasterized at their native 320×240 source resolution. It never writes to
+ * the SVG sources.
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -29,6 +29,7 @@ const DISHES = [
   { id: "hotate", sourceName: "HOTATE.svg", mode: "grid" },
   { id: "ikura", sourceName: "IKURA.svg", mode: "grid" },
   { id: "maguro", sourceName: "MAGURO.svg", mode: "grid" },
+  { id: "namaebi", sourceName: "NAMAEBI.svg", mode: "native" },
   { id: "negitoro", sourceName: "NEGITORO.svg", mode: "grid" },
   { id: "saba", sourceName: "SABA.svg", mode: "grid" },
   { id: "tako", sourceName: "TAKO.svg", mode: "grid" },

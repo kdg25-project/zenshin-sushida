@@ -47,6 +47,14 @@
     "alpha": "opaque-or-transparent",
     "mode": "grid"
   },
+  "namaebi": {
+    "source": "NAMAEBI.svg",
+    "sourceSha256": "65ab52ce26996697a2b5ab2e1aa06fed636bc9f326da2de3dc1c820d1abe5fe9",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
   "negitoro": {
     "source": "NEGITORO.svg",
     "sourceSha256": "3afe7f801076843c55db45114e301c4b497dc1a8614a6b413ccc3bb7b3a49bb6",

@@ -8,8 +8,8 @@ import { drawSushiPlate, loadSushiArt, PROVIDED_SUSHI_SVG_SOURCES, SUSHI_ART_IDS
 import { RULES_KEY } from "./game-rules";
 import { ROMAJI_ALPHABET, SUSHI_WORDS, sushiWord, wordSequence } from "./sushi-words";
 
-const CATALOG_IDS = ["ebi", "ikura", "uni", "tako", "saba", "akagai", "negitoro", "hotate", "binchoumaguro", "maguro", "tekka"];
-const ASSET_IDS = ["akagai", "binchoumaguro", "ebi", "hotate", "ikura", "maguro", "negitoro", "saba", "tako", "tekka", "uni"];
+const CATALOG_IDS = ["ebi", "ikura", "uni", "tako", "saba", "akagai", "negitoro", "hotate", "binchoumaguro", "maguro", "tekka", "namaebi"];
+const ASSET_IDS = ["akagai", "binchoumaguro", "ebi", "hotate", "ikura", "maguro", "namaebi", "negitoro", "saba", "tako", "tekka", "uni"];
 const LEGACY_PNG_SHA256 = {
   akagai: "61800a9ba171fceb0097c3a0f70c3f7859764a6c973afd5d22c6517f40ae76e4",
   binchoumaguro: "9984b50b14b990501953f0e0367ac4e95eb7dd323c17fe025769df9371185b0b",
@@ -41,7 +41,7 @@ function rgbaPixels(source: Buffer) {
 }
 
 describe("sushi dish deck", () => {
-  it("contains exactly the eleven supplied dishes with playable romaji and matching artwork", () => {
+  it("contains exactly the twelve supplied dishes with playable romaji and matching artwork", () => {
     expect(SUSHI_WORDS.map(word => word.id)).toEqual(CATALOG_IDS);
     expect(new Set(SUSHI_WORDS.map(word => word.name)).size).toBe(SUSHI_WORDS.length);
     const playable = new Set(POSE_TEMPLATES.map(template => template.id));
@@ -53,13 +53,13 @@ describe("sushi dish deck", () => {
     }
     expect(SUSHI_ART_IDS).toEqual(CATALOG_IDS);
     expect(Object.keys(SUSHI_PIXEL_SOURCES)).toEqual(ASSET_IDS);
-    expect(RULES_KEY).toContain("|words-v5|");
+    expect(RULES_KEY).toContain("|words-v6|");
   });
 
   it("uses only the supplied SVGs as provenance and normalized pixels at runtime", () => {
     expect(PROVIDED_SUSHI_SVG_SOURCES).toEqual({
       akagai: "/assets/sushi-svg/AKAGAI.svg", binchoumaguro: "/assets/sushi-svg/BINCHOUMAGURO.svg", ebi: "/assets/sushi-svg/EBI.svg",
-      hotate: "/assets/sushi-svg/HOTATE.svg", ikura: "/assets/sushi-svg/IKURA.svg", maguro: "/assets/sushi-svg/MAGURO.svg",
+      hotate: "/assets/sushi-svg/HOTATE.svg", ikura: "/assets/sushi-svg/IKURA.svg", maguro: "/assets/sushi-svg/MAGURO.svg", namaebi: "/assets/sushi-svg/NAMAEBI.svg",
       negitoro: "/assets/sushi-svg/NEGITORO.svg", saba: "/assets/sushi-svg/SABA.svg", tako: "/assets/sushi-svg/TAKO.svg",
       tekka: "/assets/sushi-svg/TEKKAMAKI.svg", uni: "/assets/sushi-svg/UNI.svg",
     });
@@ -112,10 +112,10 @@ describe("sushi dish deck", () => {
     expect(Object.keys(manifest)).toEqual(ASSET_IDS);
     for (const id of ASSET_IDS) {
       const image = rgbaPixels(readFileSync(`public/assets/sushi-pixel/${id}.png`));
-      expect(image.width).toBe(id === "tekka" ? 320 : 32);
-      expect(image.height).toBe(id === "tekka" ? 240 : ["ikura", "negitoro", "uni"].includes(id) ? 30 : 24);
+      expect(image.width).toBe(["namaebi", "tekka"].includes(id) ? 320 : 32);
+      expect(image.height).toBe(["namaebi", "tekka"].includes(id) ? 240 : ["ikura", "negitoro", "uni"].includes(id) ? 30 : 24);
       expect(manifest[id]?.sourceSha256).toMatch(/^[a-f\d]{64}$/);
-      expect(manifest[id]?.mode).toBe(id === "tekka" ? "native" : "grid");
+      expect(manifest[id]?.mode).toBe(["namaebi", "tekka"].includes(id) ? "native" : "grid");
       for (let offset = 3; offset < image.rgba.length; offset += 4) expect([0, 255]).toContain(image.rgba[offset]);
       if (id in LEGACY_PNG_SHA256) expect(createHash("sha256").update(readFileSync(`public/assets/sushi-pixel/${id}.png`)).digest("hex")).toBe(LEGACY_PNG_SHA256[id as keyof typeof LEGACY_PNG_SHA256]);
     }
@@ -127,6 +127,13 @@ describe("sushi dish deck", () => {
     expect(colors.get("92,119,189,255")).toBeGreaterThan(0); // retained blue plate
     expect(colors.get("0,0,0,255")).toBeGreaterThan(0); // default fill for stroke-only cls-2
     expect(colors.get("46,46,46,255")).toBeGreaterThan(0); // retained nori gray
+
+    const namaebi = rgbaPixels(readFileSync("public/assets/sushi-pixel/namaebi.png"));
+    for (const [x, y] of [[0, 0], [namaebi.width - 1, 0], [0, namaebi.height - 1], [namaebi.width - 1, namaebi.height - 1]]) expect(namaebi.rgba[(y * namaebi.width + x) * 4 + 3]).toBe(0);
+    const namaebiColors = new Map<string, number>();
+    for (let offset = 0; offset < namaebi.rgba.length; offset += 4) { const color = [...namaebi.rgba.subarray(offset, offset + 4)].join(","); namaebiColors.set(color, (namaebiColors.get(color) ?? 0) + 1); }
+    expect(namaebiColors.get("67,113,175,255")).toBeGreaterThan(0); // retained blue plate
+    expect(namaebiColors.get("255,158,117,255")).toBeGreaterThan(0); // retained shrimp
   }, 15_000);
 
   it("deals every supplied dish once before repeating for each deterministic seed", () => {
