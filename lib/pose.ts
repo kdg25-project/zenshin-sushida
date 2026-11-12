@@ -31,7 +31,7 @@ const paths: JointName[][] = [["leftShoulder", "leftElbow", "leftWrist"], ["righ
 // reproduce every stroke of a font. The arm/leg lines carry the recognisable parts
 // of each capital while both feet remain grounded.
 export const POSE_TEMPLATES: PoseTemplate[] = [
-  ["A", "A", "両手を頭上で近づけ、足を広げてAの頂点を作る", { leftElbow:{x:-.86,y:-1.55},rightElbow:{x:.86,y:-1.55},leftWrist:{x:-.12,y:-2.35},rightWrist:{x:.12,y:-2.35},leftKnee:{x:-.92,y:1.08},rightKnee:{x:.92,y:1.08},leftAnkle:{x:-1.35,y:2.08},rightAnkle:{x:1.35,y:2.08} }],
+  ["A", "A", "両手を頭の少し上で近づけ、ひじを自然に曲げて足を広げる", { leftElbow:{x:-.8,y:-1.6},rightElbow:{x:.8,y:-1.6},leftWrist:{x:-.18,y:-2.15},rightWrist:{x:.18,y:-2.15},leftKnee:{x:-.92,y:1.08},rightKnee:{x:.92,y:1.08},leftAnkle:{x:-1.35,y:2.08},rightAnkle:{x:1.35,y:2.08} }],
   ["B", "B", "左腕を体側の縦線にし、右ひじを張って胸の前へ曲げる", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.3,y:-1.18},rightWrist:{x:.28,y:-.24} }],
   ["C", "C", "左腕を上の弧、右腕を下の弧にして、右側を開けたCの輪郭を作る", { leftElbow:{x:-1.28,y:-1.56},leftWrist:{x:-.35,y:-2.15},rightElbow:{x:1.25,y:.1},rightWrist:{x:.35,y:1.05},leftKnee:{x:-.5,y:1.16},rightKnee:{x:.5,y:1.16},leftAnkle:{x:-.65,y:2.2},rightAnkle:{x:.65,y:2.2} }],
   ["E", "E", "左腕を体側の縦線にし、右腕を肩の高さで横へ伸ばす", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.28,y:-1},rightWrist:{x:2.08,y:-1} }],

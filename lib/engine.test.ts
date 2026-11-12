@@ -56,12 +56,12 @@ function noisyPose(source: NormalizedPose, seed: number): NormalizedPose {
 describe("pose matcher",()=>{
  it("recognizes every exact provisional pose despite a wide source aspect",()=>{for(const pose of POSE_TEMPLATES){const score=matchPose(syntheticLandmarks(pose,16/9),16/9,pose);expect(score.valid).toBe(true);expect(score.accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);}});
  it("uses exactly the canonical ROMAJI letters and rejects an obviously different pose",()=>{expect(POSE_TEMPLATES.map(pose=>pose.id)).toEqual([...ROMAJI_ALPHABET]);const upright=POSE_TEMPLATES.find(x=>x.id==="M")!, handsDown=POSE_TEMPLATES.find(x=>x.id==="I")!;expect(matchPose(syntheticLandmarks(handsDown),16/9,upright).accuracy).toBeLessThan(DEFAULT_CONFIG.threshold);});
- it("uses the current pose template version and guarded rules in gameplay and leaderboard isolation",()=>{expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(DEFAULT_CONFIG.rulesVersion).toBe("rules-v5");expect(RULES_KEY).toBe(`rules-v5|score-v1|words-v6|${POSE_TEMPLATE_VERSION}|60000|0.75|400`);});
+ it("uses the current pose template version and guarded rules in gameplay and leaderboard isolation",()=>{expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(DEFAULT_CONFIG.rulesVersion).toBe("rules-v6");expect(RULES_KEY).toBe(`rules-v6|score-v1|words-v6|${POSE_TEMPLATE_VERSION}|60000|0.75|400`);});
  it("keeps every limb in a plausible standing range and preserves key letter silhouettes",()=>{
   for(const template of POSE_TEMPLATES) for(const [start,end] of [["leftShoulder","leftElbow"],["leftElbow","leftWrist"],["rightShoulder","rightElbow"],["rightElbow","rightWrist"],["leftHip","leftKnee"],["leftKnee","leftAnkle"],["rightHip","rightKnee"],["rightKnee","rightAnkle"]] as const) { const length=distance(template.pose[start],template.pose[end]);expect(length,`${template.id}:${start}-${end}`).toBeGreaterThan(.5);expect(length,`${template.id}:${start}-${end}`).toBeLessThan(1.5); }
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
   const A=byId("A").pose,C=byId("C").pose,H=byId("H").pose,M=byId("M").pose,O=byId("O").pose,U=byId("U").pose;
-  expect(distance(A.leftWrist,A.rightWrist)).toBeLessThan(.3);expect(Math.abs(A.leftAnkle.x-A.rightAnkle.x)).toBeGreaterThan(2);
+  expect(distance(A.leftWrist,A.rightWrist)).toBeLessThan(.4);expect(Math.abs(A.leftAnkle.x-A.rightAnkle.x)).toBeGreaterThan(2);
   expect(M.leftWrist.y).toBeGreaterThan(M.leftElbow.y);expect(M.rightWrist.y).toBeGreaterThan(M.rightElbow.y);
   expect(distance(O.leftWrist,O.rightWrist)).toBeLessThan(.3);expect(Math.abs(O.leftElbow.x-O.rightElbow.x)).toBeGreaterThan(2);
   expect(U.leftWrist.y).toBeLessThan(U.leftElbow.y);expect(U.rightWrist.y).toBeLessThan(U.rightElbow.y);
@@ -76,9 +76,15 @@ describe("pose matcher",()=>{
   expect(accepted10).toHaveLength(15);expect(accepted20).toHaveLength(13);
   for(const actual of POSE_TEMPLATES){const normalized=normalizedBent(actual,20);for(const target of POSE_TEMPLATES)if(target.id!==actual.id)expect(matchTargetPose(normalized,target,DEFAULT_CONFIG.threshold).accepted,`${actual.id} must not solve ${target.id}`).toBe(false);}
  });
- it("admits the approved E/K, G and M relaxation boundary while retaining the G/S ambiguity guard",()=>{
+ it("admits the approved A/E/K, G and M relaxation boundary while retaining the G/S ambiguity guard",()=>{
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
-  const e=byId("E"),k=byId("K"),g=byId("G"),s=byId("S"),m=byId("M");
+  const a=byId("A"),e=byId("E"),k=byId("K"),g=byId("G"),s=byId("S"),m=byId("M");
+  const v6A: NormalizedPose={...a.pose,leftElbow:{x:-.86,y:-1.55},rightElbow:{x:.86,y:-1.55},leftWrist:{x:-.12,y:-2.35},rightWrist:{x:.12,y:-2.35}};
+  expect(matchTargetPose(v6A,a).accepted).toBe(true);
+  const naturalArms: NormalizedPose={...a.pose,leftWrist:{x:-.25,y:-1.95},rightWrist:{x:.25,y:-1.95}};
+  const oldATemplate={...a,pose:v6A};
+  expect(matchTargetPose(naturalArms,a).accuracy).toBeGreaterThan(matchTargetPose(naturalArms,oldATemplate).accuracy);
+  for(let seed=1;seed<=5;seed++){const noisyA=matchTargetPose(noisyPose(naturallyBent(a.pose,20),seed),a);expect(noisyA.accepted,`A/20°/seed${seed}`).toBe(true);if(seed===1){expect(noisyA.margin).toBeGreaterThanOrEqual(.025);expect(noisyA.margin).toBeLessThan(.03);expect(matchTargetPose(noisyPose(naturallyBent(a.pose,20),seed),byId("O")).accepted).toBe(false);expect(matchTargetPose(noisyPose(naturallyBent(a.pose,20),seed),m).accepted).toBe(false);}}
   expect(matchTargetPose(normalizeLandmarks(rawFromNormalized(naturallyBent(k.pose,35)),16/9).pose!,k).accepted).toBe(true);
   expect(matchTargetPose(normalizeLandmarks(rawFromNormalized(naturallyBent(k.pose,40)),16/9).pose!,k).accepted).toBe(true);
   expect(matchTargetPose(normalizeLandmarks(rawFromNormalized(armsBent(e.pose,0,50)),16/9).pose!,e).accepted).toBe(true);
