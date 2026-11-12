@@ -37,6 +37,10 @@ function phaseFor(props: Props): Phase {
   if (props.session.status === "playing" || props.session.status === "countdown") return "play";
   return "calibration";
 }
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+}
 const pixelFont = `"SushiDigits", "SushiLine", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif`;
 const digitFont = `"SushiDigits", ui-monospace, monospace`;
 const rankingNameFont = `"SushiLine", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif`;
@@ -386,6 +390,20 @@ export function GameCanvas(props: Props) {
   const [hover, setHover] = useState("");
   const currentPhase = phaseFor(props), activeRects = layoutMode === "portrait" ? portraitGameRects : gameRects;
   useEffect(() => { painterRef.current?.update(); }, [props, hover]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || isEditableTarget(event.target)) return;
+      if (event.key !== "f" && event.key !== "F" && event.code !== "KeyF") return;
+      event.preventDefault();
+      if (document.fullscreenElement) {
+        if (typeof document.exitFullscreen === "function") void document.exitFullscreen().catch(() => undefined);
+      } else if (typeof document.documentElement.requestFullscreen === "function") {
+        void document.documentElement.requestFullscreen().catch(() => undefined);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
   useEffect(() => {
     const wake = () => painterRef.current?.wake();
     const art = loadSushiArt(wake), reference = loadSfUiAssets(wake);
