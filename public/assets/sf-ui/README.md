@@ -4,6 +4,8 @@ The gameplay PNGs were cropped from `/Users/tah/Downloads/2026_SF_game-ui.ai`; r
 
 | Asset | Dimensions | Intended use |
 | --- | ---: | --- |
+| `menu-reference.png` | 1600x900 | Supplied desktop menu scene; native controls are overlaid for input and actions. |
+| `menu-tea.png` | 161x304 | Transparent source tea-pot export used as the portrait demo action. |
 | `top-wood.png` | 1920x210 | Dark wood header texture behind the HUD |
 | `counter-wood.png` | 1920x380 | Vertical wood counter texture below the conveyor |
 | `lantern-left.png` / `lantern-right.png` | 150x185 | Fixed side lantern decorations; the 寿 character is static reference art |

@@ -127,6 +127,17 @@ describe("game canvas layout", () => {
     expect(rectsOverlap(gameRects.menuRanking, gameRects.menuPoseList)).toBe(false);
   });
 
+  it("maps the supplied tea pot to the demo action without covering primary menu controls", () => {
+    expect(gameRects.menuPractice).toEqual({ x:1060, y:440, width:110, height:200 });
+    expect(portraitGameRects.menuPractice).toEqual({ x:410, y:640, width:130, height:245 });
+    for (const [tea, primary] of [[gameRects.menuPractice, gameRects.menuPoseList], [portraitGameRects.menuPractice, portraitGameRects.menuPoseList]] as const) {
+      expect(rectsOverlap(tea, primary)).toBe(false);
+    }
+    const portraitTea = cssRect(portraitGameRects.menuPractice, fitGameViewport(390, 844));
+    expect(portraitTea.width).toBeGreaterThanOrEqual(44);
+    expect(portraitTea.height).toBeGreaterThanOrEqual(44);
+  });
+
   it("uses one stable viewport-width predicate at the responsive boundaries", () => {
     expect(gameLayoutModeForWidth(390)).toBe("portrait");
     expect(gameLayoutModeForWidth(560)).toBe("portrait");

@@ -49,7 +49,8 @@ export const gameRects = {
   // Mask only the baked placeholder text; the pencil and ornate border stay visible.
   name: { x: 357, y: 284, width: 421, height: 36 },
   menuCamera: { x: 250, y: 371, width: 700, height: 136 },
-  menuPractice: { x: 1065, y: 527, width: 90, height: 95 },
+  // The supplied tea pot is the demo entry; include the steam and cup in its hit area.
+  menuPractice: { x: 1060, y: 440, width: 110, height: 200 },
   menuRanking: { x: 202, y: 541, width: 380, height: 77 },
   menuPoseList: { x: 618, y: 541, width: 380, height: 77 },
   calibrationStart: { x: 330, y: 490, width: 330, height: 48 },
@@ -104,7 +105,8 @@ export const portraitGameRects = {
   ...gameRects,
   name: { x: 65, y: 199, width: 406, height: 35 },
   menuCamera: { x: 37, y: 267, width: 526, height: 108 },
-  menuPractice: { x: 410, y: 640, width: 130, height: 96 },
+  // Preserve the tea pot's 161×304 source aspect in the portrait free area.
+  menuPractice: { x: 410, y: 640, width: 130, height: 245 },
   menuRanking: { x: 60, y: 405, width: 480, height: 99 },
   menuPoseList: { x: 60, y: 520, width: 480, height: 99 },
   camera: { x: 30, y: 190, width: 540, height: 290 },

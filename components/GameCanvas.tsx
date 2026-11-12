@@ -213,8 +213,6 @@ function drawMenu(ctx: CanvasRenderingContext2D, reference: SfUiAssets | undefin
     ctx.save(); ctx.imageSmoothingEnabled = false;
     ctx.drawImage(reference!.menuReference!, 0, 0, width, GAME_HEIGHT);
     ctx.restore();
-    // The supplied lower-right tile is intentionally blank; retain it as the small demo route.
-    text(ctx, "デモ", rects.menuPractice.x + rects.menuPractice.width / 2, rects.menuPractice.y + rects.menuPractice.height / 2, 17, "#5d3419", "center", pixelFont);
   } else {
     // Recompose the supplied artwork into a vertical menu instead of shrinking its controls.
     drawWoodTexture(ctx, reference, width, PORTRAIT_HEIGHT, true);
@@ -226,7 +224,7 @@ function drawMenu(ctx: CanvasRenderingContext2D, reference: SfUiAssets | undefin
       ctx.drawImage(image, 320, 478, 960, 198, 37, 267, 526, 108);
       ctx.drawImage(image, 264, 718, 514, 106, 60, 405, 480, 99);
       ctx.drawImage(image, 818, 718, 516, 106, 60, 520, 480, 99);
-      ctx.drawImage(image, 1425, 703, 115, 132, 410, 640, 130, 96);
+      drawImage(ctx, reference?.menuTea, rects.menuPractice);
       ctx.restore();
     } else {
       paper(ctx, { x:42, y:163, width:516, height:108 }, "#fde0b4");
@@ -234,9 +232,7 @@ function drawMenu(ctx: CanvasRenderingContext2D, reference: SfUiAssets | undefin
       menuPanel(ctx, rects.menuCamera, "あそぶ", true);
       menuPanel(ctx, rects.menuRanking, "ランキング");
       menuPanel(ctx, rects.menuPoseList, "ポーズ一覧");
-      menuPanel(ctx, rects.menuPractice, "デモ");
     }
-    text(ctx, "デモ", rects.menuPractice.x + rects.menuPractice.width / 2, rects.menuPractice.y + rects.menuPractice.height / 2, 17, "#5d3419", "center", pixelFont);
   }
   const nameError = props.nameError?.replace("ランキング名", "ニックネーム");
   if (nameError) text(ctx, nameError, width / 2, rects.name.y + rects.name.height + (portrait ? 28 : 34), portrait ? 16 : 15, "#ffb7a8", "center", pixelFont);
@@ -432,9 +428,9 @@ export function GameCanvas(props: Props) {
     media.addEventListener("change", onMotionChange); window.addEventListener("resize", resize); document.addEventListener("visibilitychange", onVisibility); applyLifecycle(); host.dataset.rendererStatus = "ready"; host.dataset.rendererMode = "2d"; setStatus("ready"); resize();
     return () => { observer?.disconnect(); intersection?.disconnect(); media.removeEventListener("change", onMotionChange); window.removeEventListener("resize", resize); document.removeEventListener("visibilitychange", onVisibility); driver.dispose(); if (painterRef.current === driver) painterRef.current = undefined; };
   }, [layoutMode]);
-  const overlay = (id: string, rect: Rect, value: string, onClick: () => void, disabled = false, current = false) => <button key={id} className="arcade-hit" style={cssRect(rect, viewport)} aria-label={value} aria-current={current ? "page" : undefined} disabled={disabled} onClick={onClick} onPointerEnter={() => setHover(id)} onPointerLeave={() => setHover("")} onFocus={() => setHover(id)} onBlur={() => setHover("")}><span className="sr-only">{value}</span></button>;
+  const overlay = (id: string, rect: Rect, value: string, onClick: () => void, disabled = false, current = false, title?: string) => <button key={id} className="arcade-hit" style={cssRect(rect, viewport)} aria-label={value} aria-current={current ? "page" : undefined} disabled={disabled} title={title} onClick={onClick} onPointerEnter={() => setHover(id)} onPointerLeave={() => setHover("")} onFocus={() => setHover(id)} onBlur={() => setHover("")}><span className="sr-only">{value}</span></button>;
   const controls = useMemo(() => {
-    if (currentPhase === "menu") return <>{overlay("camera", activeRects.menuCamera, "あそぶ", props.onOpenCamera, !props.playerName)}{overlay("demo", activeRects.menuPractice, "デモを見る。自動入力、ランキング対象外", props.onPractice)}{overlay("ranking", activeRects.menuRanking, "ランキング", props.onRankings)}{overlay("poseList", activeRects.menuPoseList, "ポーズ一覧を開く", props.onOpenPoseList)}</>;
+    if (currentPhase === "menu") return <>{overlay("camera", activeRects.menuCamera, "あそぶ", props.onOpenCamera, !props.playerName)}{overlay("demo", activeRects.menuPractice, "お茶をいれて自動デモを見る。自動入力、ランキング対象外", props.onPractice, false, false, "お茶をいれて自動デモを見る")}{overlay("ranking", activeRects.menuRanking, "ランキング", props.onRankings)}{overlay("poseList", activeRects.menuPoseList, "ポーズ一覧を開く", props.onOpenPoseList)}</>;
     if (currentPhase === "calibration") { const cta = resolveCameraCta({ simulation:props.simulation, calibrated:props.cameraCalibrated, starting:props.cameraStarting, hasName:!!props.playerName }); return <>{overlay("start", activeRects.calibrationStart, props.simulation ? "自動デモを開始" : cta.label, cta.action === "start-camera" ? props.onStartCamera : props.onStart, cta.disabled)}{overlay("back", activeRects.calibrationBack, "メニューへ", props.onBackMenu)}</>; }
     if (currentPhase === "play") return props.session.status === "playing" ? overlay("skip", activeRects.gameSkip, "このおすしを流す。コンボは0になります", props.onSkip) : null;
     if (currentPhase === "result") return <>{props.rankingEligible && overlay("register", activeRects.resultRegister, "ランキングに登録する", props.onRegister, props.submitting)}{overlay("retry", activeRects.resultRetry, "もう一度にぎる", props.onRetry)}{overlay("menu", activeRects.resultMenu, "メニューへ", props.onBackMenu)}</>;
