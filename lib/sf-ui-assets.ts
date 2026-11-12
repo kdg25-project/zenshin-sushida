@@ -1,7 +1,9 @@
 /** Presentation-only crops from the supplied Illustrator reference. */
-export type SfUiAssets = Partial<Record<"topWood" | "counterWood" | "lanternLeft" | "lanternRight" | "conveyor" | "wave" | "hourglass" | "plateStack" | "poseGuide" | "poseCamera" | "rankingTitle" | "rankingBack" | "rankingRefresh" | "rankingPagerNormal" | "rankingPagerSelected" | "rankingPagerPrevious" | "rankingPagerNext" | "rankingRankBadge" | "rankingCrownOne" | "rankingCrownTwo" | "rankingCrownThree", HTMLImageElement>>;
+export type SfUiAssets = Partial<Record<"menuReference" | "topWood" | "counterWood" | "lanternLeft" | "lanternRight" | "conveyor" | "wave" | "hourglass" | "plateStack" | "poseGuide" | "poseCamera" | "rankingTitle" | "rankingBack" | "rankingRefresh" | "rankingPagerNormal" | "rankingPagerSelected" | "rankingPagerPrevious" | "rankingPagerNext" | "rankingRankBadge" | "rankingCrownOne" | "rankingCrownTwo" | "rankingCrownThree", HTMLImageElement>>;
 
 const sources = {
+  // Whole supplied menu artwork, with native interactive controls overlaid by GameCanvas.
+  menuReference: "/assets/sf-ui/menu-reference.png",
   topWood: "/assets/sf-ui/top-wood.png", counterWood: "/assets/sf-ui/counter-wood.png",
   lanternLeft: "/assets/sf-ui/lantern-left.png", lanternRight: "/assets/sf-ui/lantern-right.png",
   conveyor: "/assets/sf-ui/conveyor-strip.png", wave: "/assets/sf-ui/wave-corner.png",

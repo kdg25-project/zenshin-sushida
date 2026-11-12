@@ -15,3 +15,10 @@
 @media(max-width:390px){.arcade-shell[data-layout="portrait"]{min-height:0;padding:0}.arcade-canvas[data-layout="portrait"]{width:100%;border-left:0;border-right:0}}
 
 .arcade-name,.pose-list-dialog,.pose-list-header h2,.pose-list-header button,.pose-card-letter,.pose-card p{font-weight:400}
+
+/* The menu frame is painted from the supplied Illustrator artwork; this is only the live
+   text layer inside its white field, leaving the pencil and pixel border visible. */
+.arcade-menu-name{border:0;border-radius:0;background:#fff;color:#777;box-shadow:none;padding:0 8px;font-family:"SushiDigits","SushiLine","Yu Gothic",sans-serif;font-weight:400;letter-spacing:.025em}
+.arcade-menu-name::placeholder{color:#8f8f8f;opacity:1}
+.arcade-menu-name:focus{outline:3px solid #f7d36f;outline-offset:3px}
+.arcade-controls .arcade-hit:disabled{cursor:not-allowed}

@@ -40,11 +40,13 @@ export function playFeedbackLayout(feedback: Rect, portrait: boolean) {
 }
 
 export const gameRects = {
-  name: { x: 405, y: 220, width: 390, height: 44 },
-  menuCamera: { x: 390, y: 304, width: 420, height: 48 },
-  menuPractice: { x: 390, y: 362, width: 420, height: 44 },
-  menuRanking: { x: 390, y: 416, width: 420, height: 42 },
-  menuPoseList: { x: 960, y: 24, width: 190, height: 78 },
+  // Measured from the supplied 1920x1080 menu artwork after it is fitted to 1200x675.
+  // Mask only the baked placeholder text; the pencil and ornate border stay visible.
+  name: { x: 357, y: 284, width: 421, height: 36 },
+  menuCamera: { x: 250, y: 371, width: 700, height: 136 },
+  menuPractice: { x: 1065, y: 527, width: 90, height: 95 },
+  menuRanking: { x: 202, y: 541, width: 380, height: 77 },
+  menuPoseList: { x: 618, y: 541, width: 380, height: 77 },
   calibrationStart: { x: 330, y: 490, width: 330, height: 48 },
   calibrationBack: { x: 680, y: 490, width: 220, height: 48 },
   gameSkip: { x: 190, y: 624, width: 330, height: 34 },
@@ -95,11 +97,11 @@ export const PORTRAIT_WIDTH = 600;
 export const PORTRAIT_HEIGHT = 1000;
 export const portraitGameRects = {
   ...gameRects,
-  name: { x: 60, y: 230, width: 480, height: 76 },
-  menuCamera: { x: 60, y: 370, width: 480, height: 92 },
-  menuPractice: { x: 60, y: 486, width: 480, height: 92 },
-  menuRanking: { x: 60, y: 602, width: 480, height: 82 },
-  menuPoseList: { x: 330, y: 16, width: 230, height: 72 },
+  name: { x: 65, y: 199, width: 406, height: 35 },
+  menuCamera: { x: 37, y: 267, width: 526, height: 108 },
+  menuPractice: { x: 410, y: 640, width: 130, height: 96 },
+  menuRanking: { x: 60, y: 405, width: 480, height: 99 },
+  menuPoseList: { x: 60, y: 520, width: 480, height: 99 },
   camera: { x: 30, y: 190, width: 540, height: 290 },
   target: { x: 30, y: 505, width: 540, height: 300 },
   calibrationStart: { x: 48, y: 570, width: 315, height: 86 },

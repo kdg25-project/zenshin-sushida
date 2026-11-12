@@ -110,6 +110,17 @@ describe("game canvas layout", () => {
     expect(cssRect(gameRects.menuCamera, viewport).height).toBe(gameRects.menuCamera.height);
   });
 
+  it("keeps the supplied menu's input and three visible actions disjoint", () => {
+    const visible = [gameRects.menuCamera, gameRects.menuRanking, gameRects.menuPoseList];
+    for (const rect of visible) {
+      expect(rectsOverlap(gameRects.name, rect)).toBe(false);
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(GAME_WIDTH);
+      expect(rect.y + rect.height).toBeLessThanOrEqual(GAME_HEIGHT);
+    }
+    expect(rectsOverlap(gameRects.menuRanking, gameRects.menuPoseList)).toBe(false);
+  });
+
   it("uses one stable viewport-width predicate at the responsive boundaries", () => {
     expect(gameLayoutModeForWidth(390)).toBe("portrait");
     expect(gameLayoutModeForWidth(560)).toBe("portrait");
