@@ -25,3 +25,18 @@
  * round. */
 .game-scene:not(.game-scene--portrait) .game-scene-tiles[data-stepped]{left:calc(600px - min(445.45px,calc((var(--tile-count) * 149.927px - 8.677px) / 2)));top:283.7px;width:min(890.9px,calc(var(--tile-count) * 149.927px - 8.677px));gap:8.677px}
 .game-scene:not(.game-scene--portrait) .game-scene-tiles[data-stepped] span{position:relative;height:142.5px;border:0;outline:0;background:transparent;color:#172a3a;font-family:"SushiLine","Yu Gothic",sans-serif;font-size:min(78px,calc(630px / var(--tile-count)));font-weight:800;line-height:1}.game-scene-tile-art{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;image-rendering:pixelated}.game-scene:not(.game-scene--portrait) .game-scene-tiles[data-stepped] b{position:relative;z-index:1;font:inherit;display:grid;place-items:center;width:100%;height:100%}.game-scene:not(.game-scene--portrait) .game-scene-tiles[data-stepped] span[data-state="done"]{color:#147516}.game-scene:not(.game-scene--portrait) .game-scene-tiles[data-stepped] span[data-state="current"]{color:#ee221a}.game-scene:not(.game-scene--portrait) .game-scene-tiles[data-stepped] span[data-state="next"]{color:#172a3a}
+
+/* Keep both ticket labels on one centred, source-safe right-hand column. */
+.game-scene-ticket[data-source] .game-scene-ticket-copy strong,.game-scene-ticket[data-source] .game-scene-ticket-copy span{left:var(--ticket-copy-left);width:var(--ticket-copy-width);text-align:center}
+.game-scene-ticket[data-source] .game-scene-ticket-copy strong{top:var(--ticket-title-top);font-size:var(--ticket-name-size)}
+.game-scene-ticket[data-source] .game-scene-ticket-copy span{top:var(--ticket-romaji-top);font-size:var(--ticket-romaji-size)}
+.game-scene-ticket--compact .game-scene-ticket-copy{inset:0;display:block}
+.game-scene-ticket--compact .game-scene-ticket-copy strong,.game-scene-ticket--compact .game-scene-ticket-copy span{position:absolute;left:var(--ticket-copy-left);width:var(--ticket-copy-width);text-align:center}
+.game-scene-ticket--compact .game-scene-ticket-copy strong{top:var(--ticket-title-top);font-size:var(--ticket-name-size)}
+.game-scene-ticket--compact .game-scene-ticket-copy span{top:var(--ticket-romaji-top);font-size:var(--ticket-romaji-size);letter-spacing:.15em}
+
+/* Standalone fixtures retain this stack order; production lifts countdown above canvas in GameCanvas. */
+.game-scene-countdown{z-index:5;pointer-events:none}
+.arcade-play-countdown{position:absolute;display:grid;place-content:center;text-align:center;pointer-events:none;background:#fff8e8ed;border:6px solid #2b150d;color:#a42d22}
+.arcade-play-countdown span{font:800 22px/1 "SushiLine","Yu Gothic",sans-serif}.arcade-play-countdown strong{font:400 72px/.9 "SushiDigits",ui-monospace,monospace}
+.arcade-canvas[data-layout="portrait"] .arcade-play-countdown span{font-size:18px}.arcade-canvas[data-layout="portrait"] .arcade-play-countdown strong{font-size:58px}

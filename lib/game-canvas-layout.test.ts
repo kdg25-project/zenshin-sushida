@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GAME_HEIGHT, GAME_WIDTH, type Rect, canvasBackingRect, containVideo, conveyorLaneWords, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, hudSnapshotKey, playFeedbackLayout, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, rectsOverlap, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
+import { GAME_HEIGHT, GAME_WIDTH, type Rect, canvasBackingRect, containVideo, conveyorLaneWords, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, hudNumericLayout, hudSnapshotKey, playCountdownOverlay, playFeedbackLayout, playGuidePanel, playGuideTargetRect, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, rectsOverlap, referenceTicketCopyLayout, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
 import { POSE_TEMPLATES } from "./pose";
 import { SUSHI_WORDS } from "./sushi-words";
 
@@ -40,6 +40,43 @@ describe("game canvas layout", () => {
         expect(rendered.y).toBeGreaterThanOrEqual(fitted.inner.y);
         expect(rendered.y).toBeLessThanOrEqual(fitted.inner.y + fitted.inner.height);
       }
+    }
+  });
+
+  it("places every live-play target below the source panel caption while keeping it inside the panel", () => {
+    for (const portrait of [false, true]) {
+      const panel = portrait ? playGuidePanel.portrait : playGuidePanel.desktop;
+      const target = playGuideTargetRect(portrait);
+      expect(target.x).toBeGreaterThan(panel.x);
+      expect(target.x + target.width).toBeLessThan(panel.x + panel.width);
+      expect(target.y).toBeGreaterThanOrEqual(panel.y + (portrait ? 50 : 62));
+      expect(target.y + target.height).toBeLessThanOrEqual(panel.y + panel.height - (portrait ? 12 : 22));
+      for (const pose of POSE_TEMPLATES) {
+        const fitted = fitTargetPose(pose.pose, target, { left: 12, top: 12, right: 12, bottom: 12 });
+        for (const point of [...Object.values(pose.pose), fitted.head]) {
+          const rendered = fitted.point(point);
+          expect(rendered.x).toBeGreaterThanOrEqual(fitted.inner.x);
+          expect(rendered.x).toBeLessThanOrEqual(fitted.inner.x + fitted.inner.width);
+          expect(rendered.y).toBeGreaterThanOrEqual(fitted.inner.y);
+          expect(rendered.y).toBeLessThanOrEqual(fitted.inner.y + fitted.inner.height);
+        }
+      }
+    }
+  });
+
+  it("uses a centred combo anchor for one-, two-, and three-digit streaks", () => {
+    expect(hudNumericLayout.combo.x).toBe(desktopScene.hudCombo.x + desktopScene.hudCombo.width / 2);
+    expect(hudNumericLayout.combo.textAnchor).toBe("middle");
+    for (const combo of [5, 42, 999]) expect(String(combo)).toHaveLength(combo < 10 ? 1 : combo < 100 ? 2 : 3);
+  });
+
+  it("keeps countdown geometry inside both stages and above the live canvas layer", () => {
+    for (const portrait of [false, true]) {
+      const { rect, zIndex } = playCountdownOverlay(portrait);
+      const width = portrait ? 600 : GAME_WIDTH, height = portrait ? 1000 : GAME_HEIGHT;
+      expect(rect.x).toBeGreaterThanOrEqual(0); expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(width); expect(rect.y + rect.height).toBeLessThanOrEqual(height);
+      expect(zIndex).toBeGreaterThan(1);
     }
   });
 
@@ -260,6 +297,18 @@ describe("game canvas layout", () => {
       const tiles = wordTileLayout(word.romaji.length, desktopScene.letters.width, false);
       expect(tiles.width).toBeLessThanOrEqual(desktopScene.letters.width);
       expect(tiles.size).toBeGreaterThan(0);
+    }
+  });
+
+  it("centres each canonical Japanese and ROMAJI label in one safe ticket column", () => {
+    for (const portrait of [false, true]) for (const word of SUSHI_WORDS) {
+      const copy = referenceTicketCopyLayout(word, portrait);
+      expect(copy.title.x + copy.title.width / 2).toBe(copy.romaji.x + copy.romaji.width / 2);
+      expect(copy.title.fontSize * Array.from(word.name).length).toBeLessThanOrEqual(copy.title.width * .9 + .001);
+      const romajiUnits = Array.from(word.romaji).length * .7 + Math.max(0, Array.from(word.romaji).length - 1) * .15;
+      expect(copy.romaji.fontSize * romajiUnits).toBeLessThanOrEqual(copy.romaji.width * .94 + .001);
+      expect(copy.title.fontSize).toBeGreaterThanOrEqual(portrait ? 19 : 24);
+      expect(copy.romaji.fontSize).toBeGreaterThanOrEqual(11);
     }
   });
 

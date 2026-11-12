@@ -1,9 +1,10 @@
 import React, { type CSSProperties } from "react";
+import { hudNumericLayout, referenceTicketCopyLayout } from "../../lib/game-canvas-layout";
 import { sceneAssetPaths } from "../../lib/sf-ui-assets";
 import { sushiPixelSource } from "../../lib/sushi-art-2d";
 import type { PlaySceneVisual } from "./types";
 
-type Props = { model: PlaySceneVisual; portrait: boolean };
+type Props = { model: PlaySceneVisual; portrait: boolean; suppressCountdown?: boolean };
 type SourceBounds = readonly [number, number, number, number];
 
 const SOURCE_SCALE = 1200 / 1920;
@@ -27,7 +28,7 @@ function SourceArt({ name, bounds, className }: { name: keyof typeof sceneAssetP
 
 function displayWord(word: string) { return Array.from(word.toUpperCase()); }
 
-export function GameScene({ model, portrait }: Props) {
+export function GameScene({ model, portrait, suppressCountdown = false }: Props) {
   const letters = displayWord(model.word.romaji);
   const shownTimer = Number.isFinite(model.remaining) ? Math.max(0, model.remaining).toFixed(1) : "0.0";
 
@@ -46,7 +47,7 @@ export function GameScene({ model, portrait }: Props) {
     <div className="game-scene-mobile-camera-frame" />
       <PosePanels model={model} compact />
     {model.showFeedback !== false ? <Feedback model={model} compact /> : null}
-    {model.countdown ? <div className="game-scene-countdown game-scene-countdown--compact"><span>ご用意！</span><strong>{model.countdown}</strong></div> : null}
+    {!suppressCountdown && model.countdown ? <div className="game-scene-countdown game-scene-countdown--compact"><span>ご用意！</span><strong>{model.countdown}</strong></div> : null}
     {model.showSkip ? <div className="game-scene-skip game-scene-skip--compact">このおすしを流す</div> : null}
     </section>;
   }
@@ -81,7 +82,7 @@ export function GameScene({ model, portrait }: Props) {
     <SourceArt name="gamePoseGuideFrameSource" bounds={[-675.5, 169.5, -115.5, 509.5]} className="game-scene-pose-frame" />
     <SourceArt name="gameCurrentPoseFrameSource" bounds={[-95.5, 169.5, 709.5, 509.5]} className="game-scene-camera-frame" />
     {model.showFeedback !== false ? <Feedback model={model} /> : null}
-    {model.countdown ? <div className="game-scene-countdown"><span>ご用意！</span><strong>{model.countdown}</strong></div> : null}
+    {!suppressCountdown && model.countdown ? <div className="game-scene-countdown"><span>ご用意！</span><strong>{model.countdown}</strong></div> : null}
     {model.showSkip ? <div className="game-scene-skip">このおすしを流す</div> : null}
   </section>;
 }
@@ -108,12 +109,12 @@ function ConveyorPreview({ words, compact = false }: { words: PlaySceneVisual["b
 function Hud({ model, timer }: { model: PlaySceneVisual; timer: string }) {
   return <svg className="game-scene-hud" viewBox="0 0 1200 675" aria-hidden="true">
     <text className="game-scene-hud-label" x="123.228" y="41.6">スコア</text>
-    <text className="game-scene-hud-value game-scene-hud-score-value" x="355" y="82.715" textAnchor="end">{model.score.toLocaleString()}</text>
-    <text className="game-scene-hud-value game-scene-hud-time-value" x="742.035" y="82.543" textAnchor="end">{timer}</text>
+    <text className="game-scene-hud-value game-scene-hud-score-value" x={hudNumericLayout.score.x} y={hudNumericLayout.score.y} textAnchor={hudNumericLayout.score.textAnchor}>{model.score.toLocaleString()}</text>
+    <text className="game-scene-hud-value game-scene-hud-time-value" x={hudNumericLayout.timer.x} y={hudNumericLayout.timer.y} textAnchor={hudNumericLayout.timer.textAnchor}>{timer}</text>
     <text className="game-scene-hud-label" x="863.083" y="38.772">連続</text>
-    <text className="game-scene-hud-value game-scene-hud-combo-value" x="862.868" y="87.461">{model.combo}</text>
+    <text className="game-scene-hud-value game-scene-hud-combo-value" x={hudNumericLayout.combo.x} y={hudNumericLayout.combo.y} textAnchor={hudNumericLayout.combo.textAnchor}>{model.combo}</text>
     <text className="game-scene-hud-label" x="1004.716" y="38.179">お皿</text>
-    <text className="game-scene-hud-value game-scene-hud-plate-value" x="1036.207" y="86.574">{model.plates}</text>
+    <text className="game-scene-hud-value game-scene-hud-plate-value" x={hudNumericLayout.plates.x} y={hudNumericLayout.plates.y} textAnchor={hudNumericLayout.plates.textAnchor}>{model.plates}</text>
   </svg>;
 }
 
@@ -123,17 +124,20 @@ function Ticket({ model, compact = false }: { model: PlaySceneVisual; compact?: 
   const sushiSource = sourceMaguro
     ? sceneAssetPaths.gameMaguroTicketInsetSource
     : sushiPixelSource(model.word.id as never);
+  const copy = referenceTicketCopyLayout(model.word, compact);
+  const copyStyle = {
+    "--ticket-copy-left": `${copy.content.x}px`,
+    "--ticket-copy-width": `${copy.content.width}px`,
+    "--ticket-title-top": `${copy.title.y}px`,
+    "--ticket-romaji-top": `${copy.romaji.y}px`,
+    "--ticket-name-size": `${copy.title.fontSize}px`,
+    "--ticket-romaji-size": `${copy.romaji.fontSize}px`,
+  } as CSSProperties;
   return <div className={["game-scene-ticket", compact && "game-scene-ticket--compact"].filter(Boolean).join(" ")} data-source={sourceFrame || undefined}>
     {sourceFrame ? <img className="game-scene-ticket-frame-art" src={sceneAssetPaths.gameCurrentSushiTicketFrame} alt="" draggable={false} /> : null}
     <img className={sourceMaguro ? "game-scene-ticket-maguro-inset" : "game-scene-ticket-sushi"} src={sushiSource} alt="" draggable={false} />
-    <div className="game-scene-ticket-copy"><strong style={{ "--ticket-name-size": `${ticketNameSize(model.word.name)}px` } as CSSProperties}>{model.word.name}</strong><span>{model.word.romaji.toUpperCase()}</span></div>
+    <div className="game-scene-ticket-copy" style={copyStyle}><strong>{model.word.name}</strong><span>{model.word.romaji.toUpperCase()}</span></div>
   </div>;
-}
-
-function ticketNameSize(name: string) {
-  // The MAGURO title slot is 216px wide at 60px.  Keep valid longer dish
-  // names complete rather than replacing them with an ellipsis.
-  return Math.max(24, Math.min(59.963, 192 / Math.max(1, Array.from(name).length)));
 }
 
 function WordTiles({ letters, letterIndex, compact = false }: { letters: string[]; letterIndex: number; compact?: boolean }) {

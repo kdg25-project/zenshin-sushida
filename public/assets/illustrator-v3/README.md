@@ -20,3 +20,12 @@ repeated for any word length at the manifest's tile pitch.
 and pencil. Its placeholder was cleared only from the measured PDF text bbox,
 so the real input must be placed on the remaining white bed. Pose-panel PNGs
 retain their fixed source captions; do not draw duplicate captions over them.
+
+`menu-start-source-tight.png` is the exception: it is a transparent native
+Illustrator group export, padded to its 1150×250 source rectangle. This avoids
+the PDF renderer's vertical seam while leaving the documented wood background
+visible outside the button artwork.
+
+The four static top-belt sushi regions in `ranking-stage-textless.png` are
+likewise native source overlays at their original pixels. They replace only
+the seam-prone sushi/plate regions; dynamic ranking data remains absent.

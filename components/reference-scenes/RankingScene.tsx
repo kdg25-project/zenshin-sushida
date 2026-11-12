@@ -17,6 +17,16 @@ const displayScore = (score: number) => Number.isFinite(score) ? Math.max(0, Mat
 
 export function RankingScene({ portrait, rows, page, pageCount, status, message }: RankingSceneProps) {
   const visiblePages = Math.max(1, Math.min(4, pageCount));
+  const bodyIsEmpty = status !== "ready" || rows.length === 0;
+  const firstNonPodiumRank = rows.findIndex((row, index) => row.rank !== index + 1);
+  const bakedCrownCount = bodyIsEmpty || rows[0]?.rank !== 1
+    ? 0
+    : Math.min(3, firstNonPodiumRank === -1 ? rows.length : firstNonPodiumRank);
+  const shouldMaskBakedCrowns = !bodyIsEmpty && bakedCrownCount < 3;
+  const shouldRebuildDesktopPodiumRows = !portrait && shouldMaskBakedCrowns;
+  const maskedCrownRows = 3 - bakedCrownCount;
+  const podiumMaskHeight = `${2.2 + maskedCrownRows * 7.71 + .25}%`;
+
   return <section className="source-scene source-scene--ranking" data-portrait={portrait || undefined} data-status={status} aria-hidden="true">
     <div className="source-ranking__backdrop" />
     <img className="source-ranking__title" src="/assets/illustrator-v3/ranking-title-source.png" alt="" />
@@ -24,8 +34,10 @@ export function RankingScene({ portrait, rows, page, pageCount, status, message 
       <div className="source-ranking__heading" aria-hidden="true">
         <span>順位</span><span>ニックネーム</span><span>スコア</span>
       </div>
+      {bodyIsEmpty ? <div className="source-ranking__body-mask" /> : null}
+      {shouldRebuildDesktopPodiumRows ? <div className="source-ranking__podium-mask" style={{ "--source-ranking-podium-mask-height": podiumMaskHeight } as React.CSSProperties} /> : null}
       <div className="source-ranking__rows">
-        {status === "ready" && rows.length > 0 ? rows.map(row => <RankingRow key={`${row.rank}-${row.playerName}`} row={row} />) : <RankingMessage status={status} message={message} />}
+        {status === "ready" && rows.length > 0 ? rows.map((row, index) => <RankingRow key={`${row.rank}-${row.playerName}`} row={row} rebuildOrdinaryFrame={shouldRebuildDesktopPodiumRows && index >= bakedCrownCount && index < 3} />) : <RankingMessage status={status} message={message} />}
       </div>
     </div>
     <Pager page={page} pageCount={visiblePages} />
@@ -37,14 +49,27 @@ export function RankingScene({ portrait, rows, page, pageCount, status, message 
   </section>;
 }
 
-function RankingRow({ row }: { row: RankingSceneRow }) {
-  return <div className="source-ranking__row">
+function RankingRow({ row, rebuildOrdinaryFrame }: { row: RankingSceneRow; rebuildOrdinaryFrame: boolean }) {
+  const podiumRank = row.rank >= 1 && row.rank <= 3 ? row.rank : undefined;
+  return <div className="source-ranking__row" data-podium-rank={podiumRank} data-rebuild-ordinary={rebuildOrdinaryFrame || undefined}>
+    {rebuildOrdinaryFrame ? <OrdinaryRowArt /> : null}
     <span className="source-ranking__rank">
       {row.rank}
     </span>
     <span className="source-ranking__name" title={row.playerName}>{row.playerName}</span>
     <span className="source-ranking__score">{displayScore(row.score)}</span>
   </div>;
+}
+
+function OrdinaryRowArt() {
+  return <>
+    <svg className="source-ranking__ordinary-frame" viewBox="0 0 824 38" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M7 0H817V3H821V7H824V31H821V35H817V38H7V35H3V31H0V7H3V3H7Z" fill="#ffe0b5" stroke="#9b3b16" strokeWidth="1" vectorEffect="non-scaling-stroke" shapeRendering="crispEdges" />
+    </svg>
+    <svg className="source-ranking__ordinary-badge" viewBox="0 0 54 26" aria-hidden="true">
+      <path d="M5 0H49L54 5V21L49 26H5L0 21V5Z" fill="#ffe0b5" stroke="#9b3b16" strokeWidth="1" vectorEffect="non-scaling-stroke" shapeRendering="crispEdges" />
+    </svg>
+  </>;
 }
 
 function RankingMessage({ status, message }: Pick<RankingSceneProps, "status" | "message">) {
@@ -54,8 +79,12 @@ function RankingMessage({ status, message }: Pick<RankingSceneProps, "status" | 
 
 function Pager({ page, pageCount }: { page: number; pageCount: number }) {
   return <div className="source-ranking__pager">
-    <span className="source-ranking__pager-arrow" data-direction="previous">◀</span>
-    {Array.from({ length: 4 }, (_, index) => <span key={index} className="source-ranking__page" data-current={index === page || undefined} data-hidden={index >= pageCount || undefined}>{index + 1}</span>)}
-    <span className="source-ranking__pager-arrow" data-direction="next">▶</span>
+    <PagerSlot className="source-ranking__pager-arrow" direction="previous" disabled={page === 0}>◀</PagerSlot>
+    {Array.from({ length: 4 }, (_, index) => <PagerSlot key={index} className="source-ranking__page" current={index === page} hidden={index >= pageCount}>{index + 1}</PagerSlot>)}
+    <PagerSlot className="source-ranking__pager-arrow" direction="next" disabled={page >= pageCount - 1}>▶</PagerSlot>
   </div>;
+}
+
+function PagerSlot({ children, className, current, direction, disabled, hidden }: { children: React.ReactNode; className: string; current?: boolean; direction?: "previous" | "next"; disabled?: boolean; hidden?: boolean }) {
+  return <span className={className} data-current={current || undefined} data-direction={direction} data-disabled={disabled || undefined} data-hidden={hidden || undefined}><span className="source-ranking__pager-label">{children}</span></span>;
 }

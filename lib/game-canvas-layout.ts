@@ -31,6 +31,56 @@ export const desktopScene = {
   calibrationMessage: { x: 180, y: 414, width: 840, height: 46 },
 } as const satisfies Record<string, Rect>;
 
+/** Fixed source-panel bounds for live play: keep the guide skeleton below its caption. */
+export const playGuidePanel = {
+  desktop: { x: 178.125, y: 443.75, width: 350, height: 212.5 },
+  portrait: { x: 30, y: 450, width: 255, height: 177 },
+} as const satisfies Record<"desktop" | "portrait", Rect>;
+
+/** The target body area excludes the source caption/header band above it. */
+export function playGuideTargetRect(portrait: boolean): Rect {
+  return portrait
+    ? { x: 54, y: 500, width: 207, height: 112 }
+    : { x: 202, y: 506, width: 302, height: 126 };
+}
+
+/** Countdown is a sibling overlay, so it stays above the live canvas and controls. */
+export function playCountdownOverlay(portrait: boolean) {
+  return { rect: portrait ? { x: 140, y: 470, width: 320, height: 130 } : { x: 435, y: 305, width: 330, height: 178 }, zIndex: 3 };
+}
+
+/** SVG anchors for source HUD values. The combo numeral must use its card centre. */
+export const hudNumericLayout = {
+  score: { x: 355, y: 82.715, textAnchor: "end" as const },
+  timer: { x: 742.035, y: 82.543, textAnchor: "end" as const },
+  combo: { x: desktopScene.hudCombo.x + desktopScene.hudCombo.width / 2, y: 87.461, textAnchor: "middle" as const },
+  plates: { x: 1036.207, y: 86.574, textAnchor: "start" as const },
+} as const;
+
+type ReferenceTicketWord = { name: string; romaji: string };
+
+/**
+ * A shared right-side ticket column: both the Japanese dish name and ROMAJI
+ * are centred in this same safe region rather than independently left-anchored.
+ */
+export function referenceTicketCopyLayout(word: ReferenceTicketWord, portrait: boolean) {
+  const content = portrait
+    ? { x: 170, y: 0, width: 288, height: 127 }
+    : { x: 270, y: 0, width: 230, height: 166 };
+  const titlePreferred = portrait ? 37 : 59.963;
+  const titleMinimum = portrait ? 19 : 24;
+  const titleSize = Math.max(titleMinimum, Math.min(titlePreferred, content.width * .9 / Math.max(1, Array.from(word.name).length)));
+  const romajiPreferred = portrait ? 18 : 20.142;
+  // Approximate the source type's glyph plus .15em tracking to keep all 32 labels inside the column.
+  const romajiUnits = Math.max(1, Array.from(word.romaji).length * .7 + Math.max(0, Array.from(word.romaji).length - 1) * .15);
+  const romajiSize = Math.max(11, Math.min(romajiPreferred, content.width * .94 / romajiUnits));
+  return {
+    content,
+    title: { x: content.x, y: portrait ? 25 : 28, width: content.width, height: portrait ? 43 : 64, fontSize: titleSize },
+    romaji: { x: content.x, y: portrait ? 80 : 106, width: content.width, height: portrait ? 25 : 32, fontSize: romajiSize },
+  };
+}
+
 /** Reserved text bands keep the feedback copy clear of the meter in both layouts. */
 export function playFeedbackLayout(feedback: Rect, portrait: boolean) {
   const inset = portrait ? 20 : 16, meter = { x:feedback.x + inset, y:feedback.y + feedback.height - (portrait ? 22 : 12), width:feedback.width - inset * 2, height:portrait ? 11 : 7 };

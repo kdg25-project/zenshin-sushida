@@ -38,13 +38,22 @@ describe("GameScene", () => {
   it("fits a legitimate longer Japanese sushi title without an ellipsis", () => {
     const markup = renderToStaticMarkup(<GameScene model={{ ...fixture, word:{ id:"negitoro", name:"ねぎとろ", romaji:"NEGITORO" } }} portrait={false}/>);
     expect(markup).toContain("ねぎとろ");
-    expect(markup).toContain("--ticket-name-size:48px");
+    expect(markup).toContain("--ticket-name-size:51.75px");
     expect(markup).not.toContain("text-overflow:ellipsis");
   });
 
   it("fits the longest canonical Japanese title in the compact game ticket", () => {
     const markup = renderToStaticMarkup(<GameScene model={{ ...fixture, word:{ id:"binchoumaguro", name:"びんちょうまぐろ", romaji:"BINCHOUMAGURO" } }} portrait/>);
     expect(markup).toContain("びんちょうまぐろ");
-    expect(markup).toContain("--ticket-name-size:24px");
+    expect(markup).toContain("--ticket-name-size:32.4px");
+  });
+
+  it("centres streak values and lets GameCanvas lift countdown above the canvas without a duplicate", () => {
+    const countdownModel = { ...fixture, combo:42, countdown:3 };
+    const markup = renderToStaticMarkup(<GameScene model={countdownModel} portrait={false}/>);
+    expect(markup).toContain('text-anchor="middle">42</text>');
+    expect(markup).toContain("game-scene-countdown");
+    const suppressed = renderToStaticMarkup(<GameScene model={countdownModel} portrait={false} suppressCountdown/>);
+    expect(suppressed).not.toContain("game-scene-countdown");
   });
 });
