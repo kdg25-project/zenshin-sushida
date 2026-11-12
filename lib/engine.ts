@@ -6,7 +6,7 @@ export type MatcherResult = { valid: boolean; accuracy: number; jointScore: numb
 /** A valid camera pose may still be too similar to another ROMAJI silhouette to solve. */
 export type GuardedMatcherResult = MatcherResult & { accepted: boolean; nearestTemplateId?: string; margin?: number };
 export type GameConfig = { durationMs: number; threshold: number; holdMs: number; scoreVersion: string; rulesVersion: string; templateVersion: string; wordVersion: string; maxFrameGapMs: number };
-export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v9", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v6", maxFrameGapMs: 180 };
+export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v10", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v6", maxFrameGapMs: 180 };
 
 const finite = (p: Point | undefined): p is Point => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -70,6 +70,37 @@ export function matchNormalizedPose(actual: NormalizedPose, template: PoseTempla
   return {valid:true,accuracy:jointScore*.35+angleScore*.45+pathScore*.20,jointScore,angleScore,pathScore,pose:actual};
 }
 
+const limbDirection = (from: Point, to: Point) => {
+  const vector=sub(to,from), length=magnitude(vector);
+  return length<1e-5 ? { x:0, y:0 } : { x:vector.x/length, y:vector.y/length };
+};
+/** H keeps both forearms nearly vertical/downward; a folded-in M must not become H. */
+function hasHForearms(actual: NormalizedPose) {
+  const left=limbDirection(actual.leftElbow,actual.leftWrist),right=limbDirection(actual.rightElbow,actual.rightWrist);
+  return left.y>=.45&&right.y>=.45&&Math.abs(left.x)<=.55&&Math.abs(right.x)<=.55&&left.x<=.35&&right.x>=-.35;
+}
+/** M's lowered elbows and inward/downward forearms are intentionally distinct from H. */
+function hasMFoldedForearms(actual: NormalizedPose) {
+  const left=limbDirection(actual.leftElbow,actual.leftWrist),right=limbDirection(actual.rightElbow,actual.rightWrist);
+  return actual.leftElbow.y-actual.leftShoulder.y>=.2&&actual.rightElbow.y-actual.rightShoulder.y>=.2&&left.y>=.4&&right.y>=.4&&left.x>=.4&&-right.x>=.4;
+}
+/** R needs an inward-folded right forearm and its characteristic outward right leg. */
+function hasRSignature(actual: NormalizedPose) {
+  const forearm=limbDirection(actual.rightElbow,actual.rightWrist);
+  return -forearm.x>=.25&&actual.rightAnkle.x-actual.rightHip.x>=.8;
+}
+function hasEOutwardRightForearm(actual: NormalizedPose) {
+  return limbDirection(actual.rightElbow,actual.rightWrist).x>=.35;
+}
+function rivalIsEligible(actual: NormalizedPose, targetId: string, rivalId: string) {
+  if(targetId==="M"&&rivalId==="H"&&hasMFoldedForearms(actual)) return hasHForearms(actual);
+  if(targetId==="E"&&rivalId==="R"&&hasEOutwardRightForearm(actual)) return hasRSignature(actual);
+  return true;
+}
+function targetHasRequiredSignature(actual: NormalizedPose, targetId: string) {
+  return targetId!=="H"||hasHForearms(actual) ? targetId!=="R"||hasRSignature(actual) : false;
+}
+
 /**
  * Scores the target against the full ROMAJI set. This intentionally keeps
  * `valid` about landmark quality only: callers can continue to render a valid
@@ -78,9 +109,9 @@ export function matchNormalizedPose(actual: NormalizedPose, template: PoseTempla
 export function matchTargetPose(actual: NormalizedPose, template: PoseTemplate, threshold = POSE_THRESHOLD): GuardedMatcherResult {
   const target = matchNormalizedPose(actual,template);
   if (!target.valid) return { ...target, accepted:false };
-  const nearest = POSE_TEMPLATES.filter(candidate=>candidate.id!==template.id).map(candidate=>({ id:candidate.id, score:matchNormalizedPose(actual,candidate).accuracy })).reduce((best,current)=>current.score>best.score?current:best,{id:"",score:-Infinity});
+  const nearest = POSE_TEMPLATES.filter(candidate=>candidate.id!==template.id&&rivalIsEligible(actual,template.id,candidate.id)).map(candidate=>({ id:candidate.id, score:matchNormalizedPose(actual,candidate).accuracy })).reduce((best,current)=>current.score>best.score?current:best,{id:"",score:-Infinity});
   const margin=target.accuracy-nearest.score;
-  return { ...target, accepted:target.accuracy>=threshold&&margin>=poseMatchMargin(template.id), nearestTemplateId:nearest.id||undefined, margin };
+  return { ...target, accepted:target.accuracy>=threshold&&margin>=poseMatchMargin(template.id)&&targetHasRequiredSignature(actual,template.id), nearestTemplateId:nearest.id||undefined, margin };
 }
 
 export type GameStatus = "idle"|"camera-check"|"countdown"|"playing"|"result";
