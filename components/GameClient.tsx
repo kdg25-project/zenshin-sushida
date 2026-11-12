@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CameraController } from "../lib/camera-controller";
-import { DEFAULT_CONFIG, advanceTime, beginPlaying, completedPlates, createSession, currentTemplate, currentWordProgress, gameResult, matchPose, matchTargetPose, observe, skipTarget, smoothPose, syntheticLandmarks, upcomingWords, wordSequence, type GameSession } from "../lib/engine";
+import { DEFAULT_CONFIG, advanceTime, beginPlaying, completedPlates, createSession, currentTemplate, currentWordProgress, gameResult, matchPose, matchTargetPose, observe, skipTarget, smoothPose, syntheticLandmarks, upcomingWords, type GameSession } from "../lib/engine";
 import { RULES_KEY } from "../lib/game-rules";
 import { formatStoredRankingAccuracy, isPlayReady, StartAttemptGate } from "../lib/game-ui";
 import { rankingPageForRefresh, RankingRefreshController, type RankingRefreshReason } from "../lib/ranking-refresh";
@@ -101,7 +101,7 @@ export default function GameClient() {
     let freshRank:RankSession | undefined;
     if(!simulation)try{const response=await fetch("/api/games",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({rulesKey:RULES_KEY,simulation:false})});if(!response.ok)throw new Error();freshRank=await response.json();}catch{if(rankStartGateRef.current.isCurrent(request))setRankMessage("ランキング用ゲームを開始できませんでした。今回はランキング対象外で遊べます。");}
     if(!rankStartGateRef.current.isCurrent(request))return;
-    const next=beginPlaying(sessionRef.current,performance.now());update(freshRank?{...next,order:wordSequence(freshRank.seed)}:next);setRankSession(freshRank);setRoundIdentity({name:playerName,rankingEligible:!!freshRank,practice:simulation});if(rankStartGateRef.current.finish(request))setRankStarting(false);
+    update(beginPlaying(sessionRef.current,performance.now(),Math.random,freshRank?.seed));setRankSession(freshRank);setRoundIdentity({name:playerName,rankingEligible:!!freshRank,practice:simulation});if(rankStartGateRef.current.finish(request))setRankStarting(false);
   };
   const submitRank=async()=>{
     if(!rankSession||!roundIdentity?.rankingEligible||roundIdentity.practice||session.status!=="result")return;

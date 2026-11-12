@@ -87,7 +87,7 @@ export type GameStatus = "idle"|"camera-check"|"countdown"|"playing"|"result";
 export type SolveEvent = { templateId:string; wordId:SushiWordId; wordIndex:number; letterIndex:number; at:number; accuracy:number; combo:number; points:number };
 /** `targetIndex` is the flattened character cursor; a dish skip advances it past remaining letters. */
 export type RoundEvent = {kind:"solve"|"skip"; targetIndex:number; templateId:string; wordId:SushiWordId; wordIndex:number; letterIndex:number; at:number; accuracy?:number};
-export type GameSession = { status:GameStatus; config:GameConfig; startedAt?:number; countdownUntil?:number; targetIndex:number; order:SushiWordId[]; wordIndex:number; letterIndex:number; used:string[]; completedWordIds:SushiWordId[]; score:number; combo:number; maxCombo:number; successes:SolveEvent[]; events:RoundEvent[]; holdSince?:number; lastFrameAt?:number; lastTemplateId?:string; lastAccuracy?:number; matchHint?:string; endedAt?:number };
+export type GameSession = { status:GameStatus; config:GameConfig; startedAt?:number; countdownUntil?:number; targetIndex:number; order:SushiWordId[]; orderSeed?:number; wordIndex:number; letterIndex:number; used:string[]; completedWordIds:SushiWordId[]; score:number; combo:number; maxCombo:number; successes:SolveEvent[]; events:RoundEvent[]; holdSince?:number; lastFrameAt?:number; lastTemplateId?:string; lastAccuracy?:number; matchHint?:string; endedAt?:number };
 export const createSession=(config:GameConfig=DEFAULT_CONFIG):GameSession=>({status:"idle",config,targetIndex:0,order:[],wordIndex:0,letterIndex:0,used:[],completedWordIds:[],score:0,combo:0,maxCombo:0,successes:[],events:[],lastAccuracy:undefined,matchHint:undefined});
 
 export { seededRandom, wordSequence };
@@ -102,18 +102,27 @@ function currentWord(session: GameSession): SushiWord {
   return sushiWord(session.order[session.wordIndex] ?? "") ?? sushiWord("ebi")!;
 }
 
-function refreshedDeck(session: GameSession, random: () => number): SushiWordId[] {
-  return shuffledWordIds(random, session.order.at(-1));
+const ORDER_LOOKAHEAD = 12;
+const SEEDED_ORDER_INITIAL_LENGTH = 200;
+
+/** Keeps the next dishes committed before the lane can render them. */
+function orderWithLookahead(order: SushiWordId[], orderSeed: number | undefined, wordIndex: number, random: () => number): SushiWordId[] {
+  const requiredLength = wordIndex + 1 + ORDER_LOOKAHEAD;
+  if (order.length >= requiredLength) return order;
+  if (orderSeed !== undefined) return wordSequence(orderSeed, Math.max(requiredLength, order.length + ORDER_LOOKAHEAD));
+  const next = [...order];
+  while (next.length < requiredLength) next.push(...shuffledWordIds(random, next.at(-1)));
+  return next;
 }
 
 function advanceWord(session: GameSession, random: () => number): Pick<GameSession, "order" | "wordIndex" | "letterIndex"> {
-  const nextWordIndex = session.wordIndex + 1;
-  if (nextWordIndex < session.order.length) return { order: session.order, wordIndex: nextWordIndex, letterIndex: 0 };
-  return { order: refreshedDeck(session, random), wordIndex: 0, letterIndex: 0 };
+  const wordIndex = session.wordIndex + 1;
+  return { order: orderWithLookahead(session.order, session.orderSeed, wordIndex, random), wordIndex, letterIndex: 0 };
 }
 
-export function beginPlaying(session:GameSession, now:number, random:()=>number=Math.random):GameSession {
-  return {...session,status:"countdown",countdownUntil:now+3500,order:shuffledWordIds(random),wordIndex:0,letterIndex:0,targetIndex:0,score:0,combo:0,maxCombo:0,successes:[],events:[],used:[],completedWordIds:[],holdSince:undefined,lastFrameAt:undefined,lastAccuracy:undefined,matchHint:undefined};
+export function beginPlaying(session:GameSession, now:number, random:()=>number=Math.random, orderSeed?:number):GameSession {
+  const order = orderSeed === undefined ? shuffledWordIds(random) : wordSequence(orderSeed, SEEDED_ORDER_INITIAL_LENGTH);
+  return {...session,status:"countdown",countdownUntil:now+3500,order:orderWithLookahead(order,orderSeed,0,random),orderSeed,wordIndex:0,letterIndex:0,targetIndex:0,score:0,combo:0,maxCombo:0,successes:[],events:[],used:[],completedWordIds:[],holdSince:undefined,lastFrameAt:undefined,lastAccuracy:undefined,matchHint:undefined};
 }
 export function advanceTime(session:GameSession, now:number):GameSession { if(session.status==="countdown"&&now>=(session.countdownUntil??now)) return {...session,status:"playing",startedAt:now,holdSince:undefined,lastFrameAt:undefined}; if(session.status==="playing"&&now>=(session.startedAt??now)+session.config.durationMs) return {...session,status:"result",endedAt:now,holdSince:undefined}; return session; }
 export function scoreFor(accuracy:number, combo:number){ return Math.round(100+accuracy*100+Math.min(combo,20)*12); }
@@ -142,13 +151,7 @@ export function skipTarget(session:GameSession, now:number):GameSession {
 }
 export function currentWordProgress(session:GameSession): SushiWordProgress { return { word:currentWord(session), wordIndex:session.wordIndex, letterIndex:session.letterIndex }; }
 export function upcomingWords(session:GameSession,count=2):SushiWord[]{
-  const words:SushiWord[]=[];
-  for(let offset=1;words.length<count;offset++){
-    const word=sushiWord(session.order[session.wordIndex+offset] ?? "");
-    if(word) words.push(word); else if(session.order.length) words.push(...session.order.slice(0,Math.min(count-words.length,session.order.length)).map(sushiWord).filter((item):item is SushiWord=>!!item));
-    else break;
-  }
-  return words.slice(0,count);
+  return session.order.slice(session.wordIndex+1,session.wordIndex+1+count).map(sushiWord).filter((word):word is SushiWord=>!!word);
 }
 export const completedPlates=(session:GameSession)=>session.completedWordIds.length;
 export function gameResult(session:GameSession){ const total=session.successes.reduce((n,s)=>n+s.accuracy,0); return {score:session.score,solved:session.successes.length,completedPlates:completedPlates(session),maxCombo:session.maxCombo,averageAccuracy:session.successes.length?total/session.successes.length:0}; }

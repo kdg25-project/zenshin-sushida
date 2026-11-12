@@ -39,6 +39,11 @@ export function playFeedbackLayout(feedback: Rect, portrait: boolean) {
   return { meter, labelBand:{ x:meter.x, y:feedback.y + 4, width:labelWidth, height:16 }, hintBand:{ x:meter.x + labelWidth + gap, y:feedback.y + 4, width:meter.width - labelWidth - gap, height:16 } };
 }
 
+/** Conveyor chevrons point left: only completed dishes occupy left-hand slots. */
+export function conveyorLaneWords<T>(previous: T | undefined, upcoming: readonly T[], portrait: boolean): (T | undefined)[] {
+  return portrait ? [previous, upcoming[0]] : [previous, upcoming[0], upcoming[1]];
+}
+
 export const gameRects = {
   // Measured from the supplied 1920x1080 menu artwork after it is fitted to 1200x675.
   // Mask only the baked placeholder text; the pencil and ornate border stay visible.

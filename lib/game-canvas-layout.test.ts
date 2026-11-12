@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { GAME_HEIGHT, GAME_WIDTH, type Rect, canvasBackingRect, containVideo, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, hudSnapshotKey, playFeedbackLayout, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, rectsOverlap, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
+import { GAME_HEIGHT, GAME_WIDTH, type Rect, canvasBackingRect, containVideo, conveyorLaneWords, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, hudSnapshotKey, playFeedbackLayout, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, rectsOverlap, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
 import { POSE_TEMPLATES } from "./pose";
 import { SUSHI_WORDS } from "./sushi-words";
 
 describe("game canvas layout", () => {
+  it("keeps the next dishes on the right of the left-moving conveyor", () => {
+    expect(conveyorLaneWords("passed", ["next", "later"], false)).toEqual(["passed", "next", "later"]);
+    expect(conveyorLaneWords(undefined, ["next", "later"], false)).toEqual([undefined, "next", "later"]);
+    expect(conveyorLaneWords("passed", ["next", "later"], true)).toEqual(["passed", "next"]);
+  });
+
   it("keeps canvas controls and DOM hit areas on the same letterboxed rects", () => {
     const viewport = fitGameViewport(390, 844);
     const rect = cssRect(portraitGameRects.menuPractice, viewport);

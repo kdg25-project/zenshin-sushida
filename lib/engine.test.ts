@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG, advanceTime, beginPlaying, completedPlates, createSession, currentTemplate, currentWordProgress, gameResult, matchPose, matchTargetPose, normalizeLandmarks, observe, skipTarget, syntheticLandmarks, upcomingWords, type GameSession } from "./engine";
 import { INDEX, POSE_TEMPLATES, REQUIRED_JOINTS, type JointName, type Landmark, type NormalizedPose, type Point } from "./pose";
-import { ROMAJI_ALPHABET, SUSHI_WORDS, wordSequence } from "./sushi-words";
+import { ROMAJI_ALPHABET, SUSHI_WORDS, sushiWord, wordSequence } from "./sushi-words";
 import { POSE_TEMPLATE_VERSION, RULES_KEY, serializeRelativeEventTime } from "./game-rules";
 
 function rawFixture(joints: Record<number, [number, number]>): Landmark[] {
@@ -157,6 +157,22 @@ describe("game engine",()=>{
   expect(game.lastAccuracy).toBe(0);
  });
  it("ends at deadline, rejects later scores, and skip resets combo only",()=>{let game=advanceTime(beginPlaying(createSession(),0,rng),3500);for(const at of [3500,3600,3700,3800,3900])game=observe(game,at,.95,true);expect(game.combo).toBe(1);const score=game.score;game={...game,combo:3}; const before=game.score;game={...game,status:"playing"}; game=observe(game,(game.startedAt??0)+60_000,.99,true);expect(game.status).toBe("result");expect(game.score).toBe(before);expect(score).toBeGreaterThan(0);});
+ it("commits one queue for the target and lane across fresh, seeded, and long boundaries",()=>{
+  const seeded=beginPlaying(createSession(),0,rng,0),sameSeed=beginPlaying(createSession(),0,()=>.9,0),otherSeed=beginPlaying(createSession(),0,rng,1);
+  expect(seeded.orderSeed).toBe(0);expect(seeded.order.slice(0,200)).toEqual(wordSequence(0,200));expect(sameSeed.order).toEqual(seeded.order);expect(otherSeed.order.slice(0,200)).not.toEqual(seeded.order.slice(0,200));
+  const freshA=beginPlaying(createSession(),0,()=>.1),freshB=beginPlaying(createSession(),0,()=>.9);
+  expect(freshA.order.slice(0,12)).not.toEqual(freshB.order.slice(0,12));expect(freshA.order).toHaveLength(24);expect(new Set(freshA.order.slice(0,12)).size).toBe(12);expect(freshA.order[11]).not.toBe(freshA.order[12]);
+  let game=advanceTime(seeded,3500);
+  for(let index=0;index<=200;index++){
+   expect(game.wordIndex).toBe(index);const next=upcomingWords(game,3),advanced=skipTarget(game,3500+index);
+   expect(next[0]?.id,`lane/current boundary ${index}`).toBe(currentWordProgress(advanced).word.id);
+   game=advanced;
+  }
+  expect(game.order.slice(0,200)).toEqual(wordSequence(0,200));expect(game.wordIndex).toBe(201);expect(game.order).toHaveLength(224);
+  const short:GameSession={...createSession(),order:["ebi"],wordIndex:0,letterIndex:0};expect(upcomingWords(short,3)).toEqual([]);
+  const seededBoundary=advanceTime(beginPlaying(createSession(),0,rng,42),3500),word=sushiWord(seededBoundary.order[11])!,atBoundary={...seededBoundary,wordIndex:11,letterIndex:word.romaji.length-1};
+  const solved=solveLetter(atBoundary,4000);expect(currentWordProgress(solved).word).toEqual(sushiWord(solved.order[12]));
+ });
  it("keeps a legal sub-millisecond final solve below the exclusive deadline",()=>{
   let game:GameSession={...createSession(),status:"playing",startedAt:0,order:["ebi","uni"],wordIndex:0,letterIndex:0,targetIndex:0};
   for(const at of [59599.6,59699.6,59799.6,59899.6,59999.6]) game=observe(game,at,.95,true);
@@ -176,7 +192,7 @@ describe("game engine",()=>{
   }
   expect(game.successes).toHaveLength(3);expect(gameResult(game)).toMatchObject({solved:3,completedPlates:1});
   expect(currentWordProgress(game)).toMatchObject({word:{id:"uni"},wordIndex:1,letterIndex:0});
-  expect(upcomingWords(game,1)).toEqual([expect.objectContaining({id:"ebi"})]);
+  expect(upcomingWords(game,1)).toEqual([sushiWord(game.order[2])]);
  });
  it("skips the remaining dish without erasing awarded letters or creating a plate",()=>{
   let game=advanceTime({...beginPlaying(createSession(),0,rng),order:["ebi","uni"],wordIndex:0,letterIndex:0,targetIndex:0},3500);

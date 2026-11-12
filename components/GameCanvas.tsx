@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { GameSession } from "../lib/engine";
-import { GAME_HEIGHT, GAME_WIDTH, PORTRAIT_HEIGHT, PORTRAIT_WIDTH, canvasBackingTransform, containVideo, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, playFeedbackLayout, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText, type Rect } from "../lib/game-canvas-layout";
+import { GAME_HEIGHT, GAME_WIDTH, PORTRAIT_HEIGHT, PORTRAIT_WIDTH, canvasBackingTransform, containVideo, conveyorLaneWords, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, playFeedbackLayout, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText, type Rect } from "../lib/game-canvas-layout";
 import { formatStoredRankingAccuracy } from "../lib/game-ui";
 import { applyPresentationLifecycle } from "../lib/presentation-lifecycle";
 import { resolveCameraCta } from "../lib/camera-cta";
 import { targetHeadRadius, TARGET_LINKS } from "../lib/pose-guide";
 import type { Landmark, PoseTemplate } from "../lib/pose";
-import type { SushiWord, SushiWordProgress } from "../lib/sushi-words";
+import { sushiWord, type SushiWord, type SushiWordProgress } from "../lib/sushi-words";
 import { SushiSceneFrameGate } from "../lib/sushi-scene-lifecycle";
 import { drawSushiPlate, drawWordmark, loadSushiArt, type SushiArtAssets } from "../lib/sushi-art-2d";
 import { drawable, loadSfUiAssets, type SfUiAssets } from "../lib/sf-ui-assets";
@@ -174,8 +174,11 @@ function drawLane(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefi
   if (!portrait && drawable(reference?.wave)) { drawImage(ctx, reference?.wave, desktopScene.waveLeft);ctx.save();ctx.translate(width,0);ctx.scale(-1,1);drawImage(ctx,reference?.wave,{...desktopScene.waveRight,x:0});ctx.restore(); }
   else { drawCornerWave(ctx, portrait ? 20 : 40, portrait ? 420 : 352); drawCornerWave(ctx, portrait ? width-20 : width-40, portrait ? 420 : 352, true); }
   wordTrack(ctx, props.wordProgress, width / 2, portrait ? 365 : desktopScene.letters.y + desktopScene.letters.height / 2, portrait ? 488 : desktopScene.letters.width, portrait);
-  const upcoming = props.upcomingWords.slice(0, portrait ? 2 : 3);
-  upcoming.forEach((word, index) => {
+  const previous = props.session.wordIndex > 0 ? sushiWord(props.session.order[props.session.wordIndex - 1] ?? "") : undefined;
+  // The belt moves left: the dish nearest on the right is next, while the left slot is already past.
+  const laneWords = conveyorLaneWords(previous, props.upcomingWords, portrait);
+  laneWords.forEach((word, index) => {
+    if (!word) return;
     const x = portrait ? 76 + index * 445 : [110, 1080, 1225][index]!, y = portrait ? laneY + (index % 2 ? 7 : -3) : 190 + (index % 2 ? 10 : 0);
     drawSushiPlate(ctx, assets, word.id, x, y, portrait ? 65 : 88);
     if (portrait) text(ctx, word.name, x, y + 38, 12, "#fff8e7", "center");

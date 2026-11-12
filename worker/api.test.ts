@@ -7,7 +7,7 @@ import { RANKING_SUBMISSION_TTL_MS, RULES_KEY } from "../lib/game-rules";
 import { serializeRelativeEventTime } from "../lib/game-rules";
 import { createRankingSubmission, isRankingReceipt } from "../lib/ranking-submission";
 import { sushiWord } from "../lib/sushi-words";
-import { wordSequence } from "./index";
+import { validateEvents, wordSequence } from "./index";
 
 const schema = ["0001_leaderboard.sql", "0002_session_seed.sql"].map(file => readFileSync(resolve(process.cwd(), "migrations", file), "utf8")).join("\n");
 
@@ -29,6 +29,12 @@ function completeFirstWord(seed: number) {
 }
 
 describe("D1 ranking API", () => {
+  it("replays the seeded prefix through the legal 200-event limit without allocating from an untrusted oversized log", () => {
+    const seed=0,skips=Array.from({length:200},(_,wordIndex)=>event(seed,wordIndex,0,wordIndex*100,"skip"));
+    expect(validateEvents(skips,seed)).toMatchObject({solved:0,completedPlates:0});
+    expect(validateEvents([...skips,{...skips[0],at:20_000}],seed)).toBeUndefined();
+  });
+
   it("replays current supplied-dish words, derives letters/plates, and rejects forged positions", async () => {
     const mf = await worker();
     try {

@@ -26,7 +26,7 @@ const findReceipt=(env:Env,sessionId:string)=>env.DB.prepare("SELECT score, solv
 /** Replays only client events; aggregate claims are never trusted. */
 function validateEvents(value:unknown, seed:number): ReplayResult|undefined {
   if(!Array.isArray(value)||value.length>200)return;
-  const deck=wordSequence(seed,200);
+  const deck=wordSequence(seed,Math.max(200,value.length+12));
   let wordIndex=0,letterIndex=0,targetIndex=0,last=0,activeAt=0,combo=0,score=0,maxCombo=0,total=0,solved=0,completedPlates=0;
   for(const raw of value){
     if(!raw||typeof raw!=="object")return;
