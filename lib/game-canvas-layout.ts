@@ -131,11 +131,11 @@ export function rankingCanvasGeometry(portrait: boolean) {
   const card = portrait ? { x:20, y:148, width:560, height:626 } : { x:142, y:118, width:916, height:476 };
   const inner = portrait ? { x:47, y:174, width:506, height:574 } : { x:169, y:144, width:862, height:424 };
   const table = portrait ? { x:38, y:225, width:524, row:44 } : { x:194, y:182, width:812, row:38 };
-  return { card, inner, table, headerY: portrait ? 190 : 162, columns: portrait ? { rankCenter:90, name:{ x:143, width:260 }, score:{ x:421, width:116 } } : { rankCenter:289, name:{ x:505, width:280 }, score:{ x:805, width:150 } } };
+  return { card, inner, table, headerY: portrait ? 190 : 162, columns: portrait ? { rankCenter:90, nameHeaderCenter:228, name:{ x:143, width:260 }, score:{ x:421, width:116 } } : { rankCenter:338, nameHeaderCenter:600, name:{ x:505, width:250 }, score:{ x:777, width:156 } } };
 }
 
 /** The source crown has the same visual weight as a normal rank badge, while staying inside one row. */
-export function rankingCrownRect(row: Rect, portrait: boolean): Rect { return { x: row.x + (portrait ? 23 : 68), y: row.y + (row.height - 32) / 2, width:54, height:32 }; }
+export function rankingCrownRect(row: Rect, portrait: boolean): Rect { return { x: row.x + (portrait ? 23 : 117), y: row.y + (row.height - 32) / 2, width:54, height:32 }; }
 
 export function fitGameViewport(width: number, height: number, compact = gameLayoutModeForWidth(width) === "portrait") {
   const logicalWidth = compact ? PORTRAIT_WIDTH : GAME_WIDTH, logicalHeight = compact ? PORTRAIT_HEIGHT : GAME_HEIGHT;

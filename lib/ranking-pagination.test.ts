@@ -47,15 +47,15 @@ describe("ranking source pager paint", () => {
     }
   });
 
-  it("keeps a disabled selected page red with a black digit, while inactive disabled pages stay cream and muted", () => {
+  it("keeps a disabled selected page red with a white digit, while inactive disabled pages stay cream and muted", () => {
     const selected = new RecordingContext(), inactive = new RecordingContext();
     drawRankingPagerButton(selected as unknown as CanvasRenderingContext2D, gameRects.rankingPage1, "1", true, true, false, "SushiDigits", {});
     drawRankingPagerButton(inactive as unknown as CanvasRenderingContext2D, gameRects.rankingPage2, "2", false, true, false, "SushiDigits", {});
     expect(selected.fills.some(fill => fill.color === rankingPagerPalette.red)).toBe(true);
-    expect(selected.text).toContainEqual(expect.objectContaining({ value:"1", color:rankingPagerPalette.ink, font:expect.stringContaining("29px") }));
+    expect(selected.text).toContainEqual(expect.objectContaining({ value:"1", color:"#fff8e6", font:expect.stringContaining("29px") }));
     expect(inactive.fills.some(fill => fill.color === rankingPagerPalette.cream)).toBe(true);
     expect(inactive.text).toContainEqual(expect.objectContaining({ value:"2", color:rankingPagerPalette.mutedInk }));
-    expect([...selected.text, ...inactive.text].some(entry => entry.color.toLowerCase().includes("fff"))).toBe(false);
+    expect(selected.text.some(entry => entry.color.toLowerCase().includes("fff"))).toBe(true);
   });
 
   it("draws fallback pixel triangles when reference arrow sprites are unavailable", () => {

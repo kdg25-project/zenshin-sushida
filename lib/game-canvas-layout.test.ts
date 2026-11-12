@@ -213,20 +213,28 @@ describe("game canvas layout", () => {
       expect(columns.name.x).toBeGreaterThanOrEqual(table.x); expect(columns.name.x + columns.name.width).toBeLessThanOrEqual(columns.score.x); expect(columns.score.x + columns.score.width).toBeLessThanOrEqual(table.x + table.width);
       expect(columns.rankCenter).toBeLessThan(columns.name.x);
       for (let index = 0; index < 10; index++) {
-        const row = { x:table.x, y:table.y + index * table.row, width:table.width, height:table.row - 2 }, crown = rankingCrownRect(row, portrait);
+        const row = { x:table.x, y:table.y + index * table.row, width:table.width, height:table.row }, crown = rankingCrownRect(row, portrait);
         expect(row.y).toBeGreaterThanOrEqual(inner.y); expect(row.y + row.height).toBeLessThanOrEqual(inner.y + inner.height - 6);
         expect(crown.y).toBeGreaterThanOrEqual(row.y); expect(crown.y + crown.height).toBeLessThanOrEqual(row.y + row.height);
       }
     }
   });
 
-  it("fits 20-character names and seven-digit scores within their ranking cells", () => {
+  it("aligns desktop ranking columns with the supplied board's rank, name, and score bands", () => {
+    const { columns } = rankingCanvasGeometry(false);
+    expect(columns.rankCenter).toBe(338);
+    expect(columns.nameHeaderCenter).toBe(600);
+    expect(columns.name).toEqual({ x:505, width:250 });
+    expect(columns.score).toEqual({ x:777, width:156 });
+  });
+
+  it("fits 20-character names and comma-formatted seven-digit scores within their ranking cells", () => {
     for (const portrait of [false, true]) {
       const { columns } = rankingCanvasGeometry(portrait);
       const nameSize = fittedTextSize(size => 20 * size * .88, portrait ? 17 : 23, 12, columns.name.width);
-      const scoreSize = fittedTextSize(size => 7 * size * .72, portrait ? 18 : 30, portrait ? 13 : 20, columns.score.width);
+      const scoreSize = fittedTextSize(size => 9 * size * .72, portrait ? 18 : 30, portrait ? 13 : 20, columns.score.width);
       expect(20 * nameSize * .88).toBeLessThanOrEqual(columns.name.width);
-      expect(7 * scoreSize * .72).toBeLessThanOrEqual(columns.score.width);
+      expect(9 * scoreSize * .72).toBeLessThanOrEqual(columns.score.width);
     }
   });
 

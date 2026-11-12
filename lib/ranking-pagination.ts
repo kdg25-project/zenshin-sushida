@@ -68,8 +68,8 @@ function fallbackButton(ctx: DrawContext, rect: Rect, selected: boolean) {
   ctx.moveTo(rect.x + notch, rect.y + inset); ctx.lineTo(rect.x + rect.width - notch, rect.y + inset); ctx.lineTo(rect.x + rect.width - inset, rect.y + notch); ctx.lineTo(rect.x + rect.width - inset, rect.y + rect.height - notch); ctx.lineTo(rect.x + rect.width - notch, rect.y + rect.height - inset); ctx.lineTo(rect.x + notch, rect.y + rect.height - inset); ctx.lineTo(rect.x + inset, rect.y + rect.height - notch); ctx.lineTo(rect.x + inset, rect.y + notch); ctx.closePath(); ctx.fill();
 }
 
-function digit(ctx: DrawContext, value: string, rect: Rect, portrait: boolean, disabled: boolean, fontFamily: string) {
-  ctx.fillStyle = disabled ? rankingPagerPalette.mutedInk : rankingPagerPalette.ink;
+function digit(ctx: DrawContext, value: string, rect: Rect, portrait: boolean, selected: boolean, disabled: boolean, fontFamily: string) {
+  ctx.fillStyle = selected ? "#fff8e6" : disabled ? rankingPagerPalette.mutedInk : rankingPagerPalette.ink;
   ctx.font = `400 ${portrait ? 38 : 29}px ${fontFamily}`;
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(value, rect.x + rect.width / 2, rect.y + rect.height / 2 + (portrait ? 1 : .5));
@@ -90,7 +90,7 @@ export function drawRankingPagerButton(ctx: DrawContext, hit: Rect, value: strin
       ctx.closePath(); ctx.fill();
     }
   }
-  if (!arrow) digit(ctx, value, rect, portrait, disabled && !selected, fontFamily);
+  if (!arrow) digit(ctx, value, rect, portrait, selected, disabled && !selected, fontFamily);
   ctx.restore();
 }
 
@@ -103,7 +103,7 @@ export function drawRankingPager(ctx: DrawContext, controls: { previous: Rect; p
 
 export function rankingBadgeVisualRect(row: Rect, portrait: boolean): Rect {
   const width = 54, height = width / (92 / 50);
-  return { x: row.x + (portrait ? 23 : 70), y: row.y + (row.height - height) / 2, width, height };
+  return { x: row.x + (portrait ? 23 : 117), y: row.y + (row.height - height) / 2, width, height };
 }
 
 export function drawRankingBadge(ctx: DrawContext, rect: Rect, rank: number, portrait: boolean, fontFamily: string, image?: HTMLImageElement) {

@@ -39,6 +39,7 @@ function phaseFor(props: Props): Phase {
 }
 const pixelFont = `"SushiDigits", "SushiLine", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif`;
 const digitFont = `"SushiDigits", ui-monospace, monospace`;
+const rankingNameFont = `"SushiLine", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif`;
 const canvasFontWeight = (family: string) => family.includes('"SushiDigits"') ? 400 : 800;
 function text(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, size = 20, color = "#392915", align: CanvasTextAlign = "left", family = pixelFont) {
   ctx.fillStyle = color; ctx.font = `${canvasFontWeight(family)} ${size}px ${family}`; ctx.textAlign = align; ctx.textBaseline = "middle"; ctx.fillText(value, x, y);
@@ -307,15 +308,24 @@ function fittedRankingText(ctx: CanvasRenderingContext2D, value: string, x: numb
   const size = fittedTextSize(next => { ctx.font = `${canvasFontWeight(family)} ${next}px ${family}`; return ctx.measureText(value).width; }, preferred, minimum, maxWidth);
   text(ctx, value, x, y, size, color, align, family);
 }
+function rankRowPath(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) {
+  const step = 7, inset = 3, right = x + width, bottom = y + height;
+  ctx.beginPath();
+  ctx.moveTo(x + step, y); ctx.lineTo(right - step, y);
+  ctx.lineTo(right - step, y + inset); ctx.lineTo(right - inset, y + inset); ctx.lineTo(right - inset, y + step); ctx.lineTo(right, y + step);
+  ctx.lineTo(right, bottom - step); ctx.lineTo(right - inset, bottom - step); ctx.lineTo(right - inset, bottom - inset); ctx.lineTo(right - step, bottom - inset); ctx.lineTo(right - step, bottom);
+  ctx.lineTo(x + step, bottom); ctx.lineTo(x + step, bottom - inset); ctx.lineTo(x + inset, bottom - inset); ctx.lineTo(x + inset, bottom - step); ctx.lineTo(x, bottom - step);
+  ctx.lineTo(x, y + step); ctx.lineTo(x + inset, y + step); ctx.lineTo(x + inset, y + inset); ctx.lineTo(x + step, y + inset); ctx.closePath();
+}
 function rankRow(ctx: CanvasRenderingContext2D, reference: SfUiAssets | undefined, row: RankEntry, rank: number, y: number, x: number, width: number, height: number, portrait: boolean, cells: { name: { x:number; width:number }; score: { x:number; width:number } }) {
   const fill = rank === 1 ? "#ffbf00" : rank === 2 ? "#bec1c7" : rank === 3 ? "#f79a18" : "#ffdcB4", border = "#93370d";
-  ctx.fillStyle = fill; ctx.fillRect(x + 7, y, width - 14, height); ctx.fillRect(x, y + 7, width, height - 14); ctx.strokeStyle = border; ctx.lineWidth = 2; ctx.strokeRect(x + 7, y + 1, width - 14, height - 2);
+  rankRowPath(ctx, x, y, width, height); ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = border; ctx.lineWidth = 2; ctx.stroke();
   const rowRect = { x, y, width, height };
   if (rank <= 3) {
     const crownRect = rankingCrownRect(rowRect, portrait);
     if (!drawSourceRankingCrown(ctx, crownRect, rank, { crownOne:reference?.rankingCrownOne, crownTwo:reference?.rankingCrownTwo, crownThree:reference?.rankingCrownThree })) drawRankingCrown(ctx, crownRect, rank, fill, digitFont);
   } else drawRankingBadge(ctx, rankingBadgeVisualRect(rowRect, portrait), rank, portrait, digitFont, reference?.rankingRankBadge);
-  fittedRankingText(ctx, row.playerName, cells.name.x, y + height / 2 + 1, portrait ? 17 : 23, 12, cells.name.width, "#100d09", "left", pixelFont); fittedRankingText(ctx, row.score.toLocaleString(), cells.score.x + cells.score.width / 2, y + height / 2 + 1, portrait ? 18 : 30, portrait ? 13 : 20, cells.score.width, "#100d09", "center", digitFont);
+  fittedRankingText(ctx, row.playerName, cells.name.x, y + height / 2 + 1, portrait ? 17 : 24, 12, cells.name.width, "#100d09", "left", rankingNameFont); fittedRankingText(ctx, row.score.toLocaleString(), cells.score.x + cells.score.width / 2, y + height / 2 + 1, portrait ? 18 : 30, portrait ? 13 : 20, cells.score.width, "#100d09", "center", digitFont);
 }
 function rankingBoard(ctx: CanvasRenderingContext2D, rect: Rect, inner: Rect) {
   ctx.fillStyle = "#0c0b0a"; ctx.fillRect(rect.x + 14, rect.y, rect.width - 28, rect.height); ctx.fillRect(rect.x, rect.y + 14, rect.width, rect.height - 28);
@@ -323,28 +333,41 @@ function rankingBoard(ctx: CanvasRenderingContext2D, rect: Rect, inner: Rect) {
   ctx.fillStyle = "#8e3515"; ctx.fillRect(rect.x + 28, rect.y + 17, rect.width - 56, rect.height - 34); ctx.fillRect(rect.x + 17, rect.y + 28, rect.width - 34, rect.height - 56);
   ctx.fillStyle = "#ffdcae"; ctx.fillRect(inner.x + 11, inner.y, inner.width - 22, inner.height); ctx.fillRect(inner.x, inner.y + 11, inner.width, inner.height - 22);
 }
-function drawRankingBackdrop(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, width: number, height: number, portrait: boolean) {
+function drawRankingBackdrop(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, reference: SfUiAssets | undefined, width: number, height: number, portrait: boolean) {
+  // The supplied composition contains only static ornament. The complete leaderboard surface
+  // is painted over it below, keeping names, scores, and pagination state live at all times.
+  if (!portrait && drawable(reference?.rankingScene)) { drawImage(ctx, reference!.rankingScene, { x:0, y:0, width, height }); return true; }
   const beltBottom = portrait ? 145 : 135, navyBottom = portrait ? 804 : 536;
   ctx.fillStyle = "#172a3a"; ctx.fillRect(0, 20, width, beltBottom - 20);
   const beltDishes = ["maguro", "tekka", "hotate", "uni"] as const;
   for (let x = -18, index = 0; x < width + 90; x += portrait ? 124 : 152, index++) { ctx.fillStyle = "#22354a"; ctx.fillRect(x, 28, portrait ? 108 : 136, beltBottom - 34); ctx.strokeStyle = "#0b1016"; ctx.lineWidth = 3; ctx.strokeRect(x, 28, portrait ? 108 : 136, beltBottom - 34); drawSushiPlate(ctx, assets, beltDishes[index % beltDishes.length]!, x + (portrait ? 53 : 68), 73, portrait ? 62 : 78); }
   if (!portrait) { drawLantern(ctx, 46, 82); drawLantern(ctx, width - 46, 82, true); }
-  ctx.fillStyle = "#172a3a"; ctx.fillRect(0, beltBottom, width, navyBottom - beltBottom); drawCornerWave(ctx, portrait ? 25 : 55, navyBottom - 96); drawCornerWave(ctx, portrait ? width - 25 : width - 55, navyBottom - 96, true);
+  ctx.fillStyle = "#172a3a"; ctx.fillRect(0, beltBottom, width, navyBottom - beltBottom); if (!portrait) { drawCornerWave(ctx, 55, navyBottom - 96); drawCornerWave(ctx, width - 55, navyBottom - 96, true); }
   ctx.fillStyle = "#a9430d"; ctx.fillRect(0, navyBottom, width, height - navyBottom); for (let x = 0; x < width; x += portrait ? 75 : 95) { ctx.fillStyle = "#572007"; ctx.fillRect(x, navyBottom, 6, height - navyBottom); ctx.fillStyle = "rgba(255,162,53,.25)"; ctx.fillRect(x + 12, navyBottom + 6, 3, height - navyBottom - 12); }
+  return false;
 }
 function drawRanking(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, reference: SfUiAssets | undefined, props: Props, rects: typeof gameRects | typeof portraitGameRects, portrait: boolean) {
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, sign = portrait ? { x:54, y:8, width:492, height:122 } : { x:353, y:4, width:494, height:122 }, geometry = rankingCanvasGeometry(portrait), { card, inner, table, headerY, columns } = geometry;
-  drawRankingBackdrop(ctx, assets, width, portrait ? PORTRAIT_HEIGHT : GAME_HEIGHT, portrait); if (drawable(reference?.rankingTitle)) drawImage(ctx, reference?.rankingTitle, sign); else { pixelFrame(ctx, sign, "#fde0b4", "#ef2419", 10); ctx.fillStyle = "#c7110d"; ctx.fillRect(sign.x + 16, sign.y + 16, sign.width - 32, 6); crown(ctx, width / 2, sign.y + 11, 0, "#ffc81b", portrait ? .58 : .68); text(ctx, "ランキング", width / 2, sign.y + sign.height * .48, portrait ? 37 : 43, "#08090b", "center", pixelFont); text(ctx, "R A N K I N G", width / 2, sign.y + sign.height * .76, portrait ? 11 : 12, "#865236", "center", pixelFont); } rankingBoard(ctx, card, inner);
-  text(ctx, "順位", columns.rankCenter, headerY, portrait ? 18 : 22, "#130e0a", "center", pixelFont); text(ctx, "ニックネーム", columns.name.x, headerY, portrait ? 18 : 22, "#130e0a", "left", pixelFont); text(ctx, "スコア", columns.score.x + columns.score.width / 2, headerY, portrait ? 18 : 22, "#130e0a", "center", pixelFont);
-  for (const checkerX of [table.x + table.width * .26, table.x + table.width * .69]) { ctx.fillStyle = "#ad411b"; for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) ctx.fillRect(checkerX + i * 8, headerY - 13 + j * 8, 5, 5); }
+  const usesSourceScene = drawRankingBackdrop(ctx, assets, reference, width, portrait ? PORTRAIT_HEIGHT : GAME_HEIGHT, portrait);
+  if (!usesSourceScene) {
+    if (drawable(reference?.rankingTitle)) drawImage(ctx, reference?.rankingTitle, sign); else { pixelFrame(ctx, sign, "#fde0b4", "#ef2419", 10); ctx.fillStyle = "#c7110d"; ctx.fillRect(sign.x + 16, sign.y + 16, sign.width - 32, 6); crown(ctx, width / 2, sign.y + 11, 0, "#ffc81b", portrait ? .58 : .68); text(ctx, "ランキング", width / 2, sign.y + sign.height * .48, portrait ? 37 : 43, "#08090b", "center", pixelFont); text(ctx, "R A N K I N G", width / 2, sign.y + sign.height * .76, portrait ? 11 : 12, "#865236", "center", pixelFont); }
+  }
+  rankingBoard(ctx, card, inner);
+  text(ctx, "順位", columns.rankCenter, headerY, portrait ? 18 : 22, "#130e0a", "center", pixelFont); text(ctx, "ニックネーム", columns.nameHeaderCenter, headerY, portrait ? 18 : 22, "#130e0a", "center", pixelFont); text(ctx, "スコア", columns.score.x + columns.score.width / 2, headerY, portrait ? 18 : 22, "#130e0a", "center", pixelFont);
+  const checkerXs = portrait ? [] : [224, 435, 723, 958];
+  for (const checkerX of checkerXs) { ctx.fillStyle = "#ad411b"; for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) ctx.fillRect(checkerX + i * 8, headerY - 13 + j * 8, 5, 5); }
   const pageStart = props.rankingPage * 10, rows = props.ranking.slice(pageStart, pageStart + 10);
   if (props.rankingStatus === "loading") text(ctx, "番付を読み込み中…", width / 2, portrait ? 490 : 385, 20, "#5f513d", "center", pixelFont);
   else if (props.rankingStatus === "error") { text(ctx, "番付を読み込めませんでした。", width / 2, portrait ? 465 : 382, 20, "#a52e24", "center", pixelFont); woodButton(ctx, rects.rankingRetry, "もう一度読む", true); }
   else if (!props.ranking.length) wrapped(ctx, "まだ記録はありません。最初の一皿をにぎろう！", width / 2, portrait ? 465 : 382, 22, "#5f513d", portrait ? 18 : 30);
-  else rows.forEach((row, index) => rankRow(ctx, reference, row, pageStart + index + 1, table.y + index * table.row, table.x, table.width, table.row - 2, portrait, columns));
+  else rows.forEach((row, index) => rankRow(ctx, reference, row, pageStart + index + 1, table.y + index * table.row, table.x, table.width, table.row, portrait, columns));
   const pages = Math.max(1, Math.min(4, Math.ceil(props.ranking.length / 10))), pageRects = [rects.rankingPage1, rects.rankingPage2, rects.rankingPage3, rects.rankingPage4];
   drawRankingPager(ctx, { previous:rects.rankingPrevious, pages:pageRects, next:rects.rankingNext }, props.rankingPage, pages, props.rankingStatus === "loading", !!props.ranking.length, portrait, digitFont, { pagerNormal:reference?.rankingPagerNormal, pagerSelected:reference?.rankingPagerSelected, pagerPrevious:reference?.rankingPagerPrevious, pagerNext:reference?.rankingPagerNext });
-  woodButton(ctx, rects.rankingBack, "メニューへ戻る"); woodButton(ctx, rects.rankingRefresh, "ランキングを更新", true, props.rankingStatus === "loading");
+  if (usesSourceScene) {
+    if (drawable(reference?.rankingBack)) drawImage(ctx, reference!.rankingBack, rects.rankingBack); else woodButton(ctx, rects.rankingBack, "メニューへ戻る");
+    if (drawable(reference?.rankingRefresh)) drawImage(ctx, reference!.rankingRefresh, rects.rankingRefresh); else woodButton(ctx, rects.rankingRefresh, "ランキングを更新", true, props.rankingStatus === "loading");
+    if (props.rankingStatus === "loading") { ctx.fillStyle = "rgba(31, 18, 10, .42)"; ctx.fillRect(rects.rankingRefresh.x, rects.rankingRefresh.y, rects.rankingRefresh.width, rects.rankingRefresh.height); }
+  } else { woodButton(ctx, rects.rankingBack, "メニューへ戻る"); woodButton(ctx, rects.rankingRefresh, "ランキングを更新", true, props.rankingStatus === "loading"); }
 }
 function paintGame(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, reference: SfUiAssets | undefined, props: Props, phase: Phase, portrait: boolean, now: number, animate: boolean) {
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, height = portrait ? PORTRAIT_HEIGHT : GAME_HEIGHT, rects = portrait ? portraitGameRects : gameRects;

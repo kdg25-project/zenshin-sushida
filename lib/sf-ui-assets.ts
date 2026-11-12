@@ -1,5 +1,5 @@
 /** Presentation-only crops from the supplied Illustrator reference. */
-export type SfUiAssets = Partial<Record<"menuReference" | "topWood" | "counterWood" | "lanternLeft" | "lanternRight" | "conveyor" | "wave" | "hourglass" | "plateStack" | "poseGuide" | "poseCamera" | "rankingTitle" | "rankingBack" | "rankingRefresh" | "rankingPagerNormal" | "rankingPagerSelected" | "rankingPagerPrevious" | "rankingPagerNext" | "rankingRankBadge" | "rankingCrownOne" | "rankingCrownTwo" | "rankingCrownThree", HTMLImageElement>>;
+export type SfUiAssets = Partial<Record<"menuReference" | "topWood" | "counterWood" | "lanternLeft" | "lanternRight" | "conveyor" | "wave" | "hourglass" | "plateStack" | "poseGuide" | "poseCamera" | "rankingScene" | "rankingTitle" | "rankingBack" | "rankingRefresh" | "rankingPagerNormal" | "rankingPagerSelected" | "rankingPagerPrevious" | "rankingPagerNext" | "rankingRankBadge" | "rankingCrownOne" | "rankingCrownTwo" | "rankingCrownThree", HTMLImageElement>>;
 
 const sources = {
   // Whole supplied menu artwork, with native interactive controls overlaid by GameCanvas.
@@ -9,6 +9,8 @@ const sources = {
   conveyor: "/assets/sf-ui/conveyor-strip.png", wave: "/assets/sf-ui/wave-corner.png",
   hourglass: "/assets/sf-ui/hourglass.png",
   plateStack: "/assets/sf-ui/plate-stack.png", poseGuide: "/assets/sf-ui/pose-guide-panel.png", poseCamera: "/assets/sf-ui/pose-camera-panel.png",
+  // The supplied desktop composition. Live rows are drawn over its blank board content.
+  rankingScene: "/assets/sf-ui/ranking-scene.png",
   rankingTitle: "/assets/sf-ui/ranking-title.png", rankingBack: "/assets/sf-ui/ranking-back.png", rankingRefresh: "/assets/sf-ui/ranking-refresh.png",
   rankingPagerNormal: "/assets/sf-ui/ranking-pager-normal.png", rankingPagerSelected: "/assets/sf-ui/ranking-pager-selected.png",
   rankingPagerPrevious: "/assets/sf-ui/ranking-pager-prev.png", rankingPagerNext: "/assets/sf-ui/ranking-pager-next.png",
