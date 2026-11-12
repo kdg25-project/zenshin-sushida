@@ -14,5 +14,8 @@
       "database_id": "a9653345-e07e-43c1-b6e5-d249275844be",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "durable_objects": { "bindings": [{ "name": "BOOTH_SESSIONS", "class_name": "BoothRoom" }] },
+  "exports": { "BoothRoom": { "type": "durable-object", "storage": "sqlite" } },
+  "ratelimits": [{ "name": "BOOTH_PASSWORD_ATTEMPTS", "namespace_id": "1001", "simple": { "limit": 18, "period": 60 } }]
 }

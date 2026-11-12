@@ -18,6 +18,12 @@ npm run build
 
 本番設定は [`wrangler.jsonc`](./wrangler.jsonc) にあり、ランキング専用のD1 `zenshin-sushida-rankings` を束縛しています。公開は `npm run deploy:production` で、静的ビルド、本番D1 migration、Worker公開を順に実行します。開発は必ず `wrangler.local.jsonc` を使うため、ローカル専用IDを本番へ使いません。
 
+## 文化祭のスタッフ操作
+
+ゲーム表示PCでは、最初にスタッフ用のパスワードを設定してから通常のゲーム画面を開きます。スタッフのスマホでは同じサイトの [`/admin`](./app/admin/page.tsx) を開き、そのパスワードで参加します。複数のスマホを同じ表示PCへ接続でき、名前の確定、カメラ準備、開始、スキップ、ランキング登録、次の人への交代を操作できます。
+
+接続中はDurable ObjectのWebSocketで表示PCと操作端末の状態を同期します。パスワードやランキング登録トークンはURLへ入れず、スマホにはゲームの映像・姿勢データ・ランキング用トークンを送信しません。表示PCだけがカメラ・ゲーム進行・ランキング登録を実行し、スマホの操作は表示PCからの確認後に完了表示になります。表示PCが切断・停止した間はスマホの操作を受け付けず、再接続を待ちます。セッションは12時間で失効し、失効後は同じパスワードで新規作成できます。表示PC右下の「スタッフ設定」から明示的に終了すると、全スマホ端末を切断してPCもパスワード設定画面へ戻します。
+
 ### GitHub連携による自動公開
 
 Cloudflare Workers Buildsでは、GitHubの `main` へのpushを公開トリガーにします。Cloudflare DashboardでWorker **zenshin-sushida** の **Settings → Builds → Connect** を開き、GitHubリポジトリを選択してください。設定値は次のとおりです。

@@ -4,5 +4,8 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-10-15",
   "assets": { "directory": "./out", "run_worker_first": ["/api/*"] },
-  "d1_databases": [{ "binding": "DB", "database_name": "zenshin-sushida-rankings", "database_id": "PASTE_D1_ID_FROM_CF_D1_CREATE", "migrations_dir": "migrations" }]
+  "d1_databases": [{ "binding": "DB", "database_name": "zenshin-sushida-rankings", "database_id": "PASTE_D1_ID_FROM_CF_D1_CREATE", "migrations_dir": "migrations" }],
+  "durable_objects": { "bindings": [{ "name": "BOOTH_SESSIONS", "class_name": "BoothRoom" }] },
+  "exports": { "BoothRoom": { "type": "durable-object", "storage": "sqlite" } },
+  "ratelimits": [{ "name": "BOOTH_PASSWORD_ATTEMPTS", "namespace_id": "REPLACE_WITH_ACCOUNT_UNIQUE_NAMESPACE", "simple": { "limit": 18, "period": 60 } }]
 }

@@ -1,12 +1,15 @@
 import { GAME_DURATION_MS, POSE_HOLD_MS, POSE_THRESHOLD, RANKING_SUBMISSION_TTL_MS, RULES_KEY } from "../lib/game-rules";
 import { type RankingReceipt, type RankingSubmitCode } from "../lib/ranking-submission";
 import { sushiWord, wordSequence, type SushiWordId } from "../lib/sushi-words";
+export { BoothRoom } from "./booth";
 
 type D1Result = { meta?: { changes?: number } };
 type D1Statement = { bind: (...values: unknown[]) => { run: () => Promise<D1Result>; all: () => Promise<{ results: unknown[] }>; first: <T>() => Promise<T | null> } };
 type D1Database = { prepare: (query: string) => D1Statement; batch: (statements: ReturnType<D1Statement["bind"]>[]) => Promise<D1Result[]> };
 type Fetcher = { fetch: (request: Request) => Promise<Response> };
-export interface Env { DB: D1Database; ASSETS: Fetcher }
+type BoothNamespace = { getByName: (name:string) => Fetcher; idFromName:(name:string)=>{toString():string}; idFromString:(id:string)=>unknown; get:(id:unknown)=>Fetcher };
+type RateLimiter = { limit:(input:{key:string})=>Promise<{success:boolean}> };
+export interface Env { DB: D1Database; ASSETS: Fetcher; BOOTH_SESSIONS: BoothNamespace; BOOTH_PASSWORD_ATTEMPTS: RateLimiter }
 
 type Event = { kind: "solve" | "skip"; targetIndex: number; templateId: string; wordId: SushiWordId; wordIndex: number; letterIndex: number; at: number; accuracy?: number };
 type ReplayResult = { score: number; solved: number; completedPlates: number; maxCombo: number; avg: number };
@@ -49,6 +52,27 @@ function validateEvents(value:unknown, seed:number): ReplayResult|undefined {
 
 async function api(request:Request, env:Env){
   const url=new URL(request.url);
+  const booth=url.pathname.match(/^\/api\/booth(\/.*)?$/);
+  if(booth){
+    const allowed=new Set(["/create","/join"]);
+    const suffix=booth[1]||"";
+    const origin=request.headers.get("origin");if(origin&&origin!==url.origin)return json({error:"別のサイトからは操作できません"},403);
+    if(suffix==="/ws"){
+      const room=url.searchParams.get("room");if(request.method!=="GET"||request.headers.get("upgrade")?.toLowerCase()!=="websocket"||!room||room.length>128)return json({error:"接続情報が不正です"},400);
+      try{return env.BOOTH_SESSIONS.get(env.BOOTH_SESSIONS.idFromString(room)).fetch(new Request("https://booth.internal/ws",request));}catch{return json({error:"接続情報が不正です"},400);}
+    }
+    if(!allowed.has(suffix))return json({error:"見つかりません"},404);
+    const password=request.headers.get("x-booth-password")?.trim();
+    if(!password||password.length<8||password.length>64)return json({error:"操作用パスワードを確認してください"},401);
+    if(suffix==="/create"||suffix==="/join"){
+      const client=request.headers.get("cf-connecting-ip")??"anonymous";
+      if(!(await env.BOOTH_PASSWORD_ATTEMPTS.limit({key:await hash(`booth-rate:v1:${client}`)})).success)return json({error:"接続が集中しています。少し待ってください"},429);
+    }
+    const code=await hash(`booth-password:v1:${password}`),roomId=env.BOOTH_SESSIONS.idFromName(`booth:${code}`),body=request.method==="GET"?undefined:await read<Record<string,unknown>>(request),headers=new Headers(request.headers);
+    headers.delete("x-booth-password");headers.set("content-type","application/json");
+    const response=await env.BOOTH_SESSIONS.getByName(`booth:${code}`).fetch(new Request(`https://booth.internal${suffix}`,{method:request.method,headers,body:request.method==="GET"?undefined:JSON.stringify({...body,code})}));
+    if((suffix==="/create"||suffix==="/join")&&response.ok){const data=await response.json();return json({...data,roomId:roomId.toString()});}return response;
+  }
   if(url.pathname==="/api/leaderboard"&&request.method==="GET"){
     const rows=await env.DB.prepare("SELECT player_name as playerName, score, solved, max_combo as maxCombo, average_accuracy as averageAccuracy, created_at as createdAt FROM leaderboard_entries WHERE rules_key=? ORDER BY score DESC, solved DESC, max_combo DESC, created_at ASC, id ASC LIMIT 40").bind(RULES_KEY).all();
     return json({rulesKey:RULES_KEY,entries:rows.results});

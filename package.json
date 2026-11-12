@@ -12,7 +12,7 @@
     "build": "next build",
     "start": "npm run dev:worker",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --no-file-parallelism",
     "test:api": "vitest run worker/api.test.ts",
     "dev:worker": "wrangler dev --config wrangler.local.jsonc --local --persist-to .local-state",
     "d1:migrate:local": "wrangler d1 migrations apply DB --config wrangler.local.jsonc --local --persist-to .local-state",
