@@ -1,6 +1,33 @@
 /** Presentation-only crops from the supplied Illustrator reference. */
 export type SfUiAssets = Partial<Record<"menuReference" | "menuTea" | "topWood" | "counterWood" | "lanternLeft" | "lanternRight" | "conveyor" | "wave" | "hourglass" | "plateStack" | "poseGuide" | "poseCamera" | "rankingScene" | "rankingTitle" | "rankingBack" | "rankingRefresh" | "rankingPagerNormal" | "rankingPagerSelected" | "rankingPagerPrevious" | "rankingPagerNext" | "rankingRankBadge" | "rankingCrownOne" | "rankingCrownTwo" | "rankingCrownThree", HTMLImageElement>>;
 
+/** Native Illustrator source exports used by the DOM scene presenters. */
+export const sceneAssetPaths = {
+  gameBgCenter: "/assets/illustrator-v3/game-bg-center.svg",
+  gameCurrentSushiTicketFrame: "/assets/illustrator-v3/game-current-sushi-ticket-frame.svg",
+  gameDecorLeft: "/assets/illustrator-v3/game-decor-left.svg",
+  gameDecorRight: "/assets/illustrator-v3/game-decor-right.svg",
+  gamePoseGuideFrameSource: "/assets/illustrator-v3/game-pose-guide-frame-source.png",
+  gameCurrentPoseFrameSource: "/assets/illustrator-v3/game-current-pose-frame-source.png",
+  gameBgTop: "/assets/illustrator-v3/game-bg-top.svg",
+  gameConveyorTrack: "/assets/illustrator-v3/game-conveyor-track.svg",
+  gameConveyorUpperRail: "/assets/illustrator-v3/game-conveyor-upper-rail.svg",
+  gameConveyorArrow: "/assets/illustrator-v3/game-conveyor-arrow.svg",
+  gameLowerWoodSource: "/assets/illustrator-v3/game-lower-wood-source.png",
+  gameLetterTileDone: "/assets/illustrator-v3/game-letter-tile-done.svg",
+  gameLetterTileCurrent: "/assets/illustrator-v3/game-letter-tile-current.svg",
+  gameLetterTileNormal: "/assets/illustrator-v3/game-letter-tile-normal.svg",
+  gameMaguroTicketInsetSource: "/assets/illustrator-v3/game-maguro-ticket-inset-source.png",
+  gameTimeFrame: "/assets/illustrator-v3/game-time-frame.svg",
+  gameTimeLabelSource: "/assets/illustrator-v3/game-time-label-source.png",
+  gameTimeHourglassSource: "/assets/illustrator-v3/game-time-hourglass-source.png",
+  gameTimeUnitSource: "/assets/illustrator-v3/game-time-unit-source.png",
+  gameScoreFrame: "/assets/illustrator-v3/game-score-frame.svg",
+  gameStreakFrame: "/assets/illustrator-v3/game-streak-frame.svg",
+  gamePlateFrame: "/assets/illustrator-v3/game-plate-frame.svg",
+  gamePlateStack: "/assets/sf-ui/plate-stack.png",
+} as const;
+
 const sources = {
   // Whole supplied menu artwork, with native interactive controls overlaid by GameCanvas.
   menuReference: "/assets/sf-ui/menu-reference.png",

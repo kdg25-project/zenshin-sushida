@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_レイヤー_1" data-name="レイヤー 1" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" viewBox="0 0 49.81 40.46">
+  <g id="Arrow">
+    <g>
+      <rect x="16.22" width="8.1" height="8.1" fill="#fff"/>
+      <rect x="16.22" y="32.36" width="8.1" height="8.1" fill="#fff"/>
+      <rect x="8.1" y="8.09" width="8.1" height="8.1" fill="#fff"/>
+      <rect x="8.1" y="24.27" width="8.1" height="8.1" fill="#fff"/>
+      <rect y="16.18" width="8.1" height="8.1" fill="#fff"/>
+    </g>
+    <g>
+      <rect x="41.72" width="8.1" height="8.1" fill="#fff"/>
+      <rect x="41.72" y="32.36" width="8.1" height="8.1" fill="#fff"/>
+      <rect x="33.6" y="8.09" width="8.1" height="8.1" fill="#fff"/>
+      <rect x="33.6" y="24.27" width="8.1" height="8.1" fill="#fff"/>
+      <rect x="25.5" y="16.18" width="8.1" height="8.1" fill="#fff"/>
+    </g>
+  </g>
+</svg>
