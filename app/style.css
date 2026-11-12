@@ -22,3 +22,4 @@
 .arcade-menu-name::placeholder{color:#8f8f8f;opacity:1}
 .arcade-menu-name:focus{outline:0}
 .arcade-controls .arcade-hit:disabled{cursor:not-allowed}
+.arcade-person-choice{position:absolute;z-index:3;border:3px solid #100d0a;background:#d7f1ff;color:#172a3a;font:400 12px "SushiDigits","SushiLine","Yu Gothic",sans-serif;box-shadow:3px 3px 0 #160b07;white-space:nowrap}.arcade-person-choice[aria-pressed="true"]{background:#e93524;color:#fff8e6}.arcade-person-choice:focus-visible{outline:2px dashed #fff8e6;outline-offset:3px}
