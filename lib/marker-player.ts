@@ -4,7 +4,8 @@ import { isPrintedMarkerId, type MarkerFrame, type MarkerObservation, type Marke
 export type { MarkerFrame, MarkerObservation, MarkerPoint } from "./aruco-types";
 
 export type MarkerPlayerPhase = "unselected"|"pending"|"tracking"|"occluded"|"reconfirm"|"ambiguous"|"duplicate";
-export type MarkerPlayerControl = { generation:number; markerId?:number; candidateId?:string; phase:MarkerPlayerPhase; lastMarkerAt?:number; lastPoseAt?:number; lastSequence?:number; signature?:BodySignature; markerSignature?:MarkerTorsoSignature; latched?:"ambiguous"|"duplicate"|"continuity"; reconfirmationSince?:number };
+export type MarkerRecovery = { count:number; candidateId:string; signature:BodySignature; markerSignature:MarkerTorsoSignature; lastPoseSignature:BodySignature; lastSequence:number; lastCapturedAt:number; lastPoseAt:number };
+export type MarkerPlayerControl = { generation:number; markerId?:number; candidateId?:string; phase:MarkerPlayerPhase; lastMarkerAt?:number; lastPoseAt?:number; lastSequence?:number; signature?:BodySignature; markerSignature?:MarkerTorsoSignature; latched?:"ambiguous"|"duplicate"|"continuity"; reconfirmationSince?:number; recovery?:MarkerRecovery; recoveryNotBefore?:number };
 export type BodySignature = { x:number; y:number; scale:number; joints:MarkerPoint[] };
 export type MarkerTorsoSignature = { x:number; y:number; area:number };
 export type MarkerAssociation = { marker:MarkerObservation; candidateId?:string; association:"matched"|"ambiguous"|"unmatched" };
@@ -14,6 +15,7 @@ export const MARKER_RESULT_MAX_AGE_MS = 350;
 export const MARKER_OCCLUSION_GRACE_MS = 1_200;
 export const MARKER_CONTINUITY_MAX_GAP_MS = 250;
 export const MARKER_BODY_FRESH_MS = 180;
+export const MARKER_RECOVERY_OBSERVATIONS = 3;
 /** A printed marker and torso should scale together; a large ratio jump is not the same body. */
 export const MARKER_TORSO_POSITION_DELTA = .18;
 export const MARKER_TORSO_AREA_LOG_DELTA = .4;
@@ -77,11 +79,26 @@ function onSegment(a:MarkerPoint,b:MarkerPoint,point:MarkerPoint){return Math.mi
 function segmentsIntersect(a:MarkerPoint,b:MarkerPoint,c:MarkerPoint,d:MarkerPoint){const ab1=orientation(a,b,c),ab2=orientation(a,b,d),cd1=orientation(c,d,a),cd2=orientation(c,d,b);return (ab1===0&&onSegment(a,b,c))||(ab2===0&&onSegment(a,b,d))||(cd1===0&&onSegment(c,d,a))||(cd2===0&&onSegment(c,d,b))||(ab1>0)!==(ab2>0)&&(cd1>0)!==(cd2>0);}
 function torsosOverlap(a:PlayerCandidate,b:PlayerCandidate) { const first=torso(a),second=torso(b); return !!first&&!!second&&(first.some(point=>pointInPolygon(point,second))||second.some(point=>pointInPolygon(point,first))||first.some((point,index)=>second.some((other,otherIndex)=>segmentsIntersect(point,first[(index+1)%first.length],other,second[(otherIndex+1)%second.length])))); }
 
-function stale(control:MarkerPlayerControl, frame:MarkerFrame, now:number) { return !Number.isFinite(frame.capturedAt)||frame.capturedAt>now||frame.generation!==control.generation || now-frame.capturedAt>MARKER_RESULT_MAX_AGE_MS || (control.lastSequence!==undefined&&frame.sequence<=control.lastSequence); }
-function stop(control:MarkerPlayerControl, phase:"reconfirm"|"ambiguous"|"duplicate", latched?:"ambiguous"|"duplicate"|"continuity", now?:number):MarkerPlayerControl { const nextLatch=latched??control.latched;return {...control,phase,latched:nextLatch,reconfirmationSince:nextLatch&&!control.latched&&Number.isFinite(now)?now:control.reconfirmationSince}; }
+function clearRecovery(control:MarkerPlayerControl,notBefore?:number):MarkerPlayerControl { const barrier=Number.isFinite(notBefore)?Math.max(control.recoveryNotBefore??-Infinity,notBefore!):control.recoveryNotBefore;return {...control,recovery:undefined,...(barrier===undefined?{}:{recoveryNotBefore:barrier})}; }
+function stop(control:MarkerPlayerControl, phase:"reconfirm"|"ambiguous"|"duplicate", latched?:"ambiguous"|"duplicate"|"continuity", now?:number):MarkerPlayerControl { const nextLatch=latched??control.latched;return {...clearRecovery(control,now),phase,latched:nextLatch,reconfirmationSince:nextLatch&&!control.latched&&Number.isFinite(now)?now:control.reconfirmationSince}; }
 function bind(control:MarkerPlayerControl, marker:MarkerObservation, candidate:PlayerCandidate, frame:MarkerFrame, now:number):MarkerPlayerControl {
   const signature=bodySignature(candidate),markerSignature=markerTorsoSignature(marker,candidate); if(!signature||!markerSignature)return stop(control,"reconfirm");
-  return {...control,markerId:marker.id,candidateId:candidate.id,phase:"tracking",lastMarkerAt:frame.capturedAt,lastPoseAt:now,lastSequence:frame.sequence,signature,markerSignature,latched:undefined,reconfirmationSince:undefined};
+  return {...control,markerId:marker.id,candidateId:candidate.id,phase:"tracking",lastMarkerAt:frame.capturedAt,lastPoseAt:now,lastSequence:frame.sequence,signature,markerSignature,latched:undefined,reconfirmationSince:undefined,recovery:undefined,recoveryNotBefore:undefined};
+}
+
+/**
+ * Booth operation assigns each printed ID to one wearer. A latch still needs
+ * three independent marker+torso observations before that operating constraint
+ * may restore control; a pose ID alone is never evidence of identity.
+ */
+function recoverLatched(control:MarkerPlayerControl, marker:MarkerObservation, candidate:PlayerCandidate, frame:MarkerFrame, now:number):MarkerPlayerControl {
+  const signature=bodySignature(candidate),markerSignature=markerTorsoSignature(marker,candidate);
+  if(!signature||!markerSignature)return clearRecovery(control);
+  const previous=control.recovery;
+  if(!previous)return {...control,recovery:{count:1,candidateId:candidate.id,signature,markerSignature,lastPoseSignature:signature,lastSequence:frame.sequence,lastCapturedAt:frame.capturedAt,lastPoseAt:now}};
+  if(frame.sequence<=previous.lastSequence||frame.capturedAt<=previous.lastCapturedAt||candidate.id!==previous.candidateId||!isContinuousBody(previous.signature,candidate)||!sameMarkerTorso(previous.markerSignature,marker,candidate))return clearRecovery(control,now);
+  const recovery={...previous,count:previous.count+1,lastPoseSignature:signature,lastSequence:frame.sequence,lastCapturedAt:frame.capturedAt,lastPoseAt:now};
+  return recovery.count>=MARKER_RECOVERY_OBSERVATIONS?bind(control,marker,candidate,frame,now):{...control,recovery};
 }
 
 /** Only a safety latch, never initial setup or normal tracking, permits staff reconfirmation. */
@@ -105,28 +122,40 @@ export function confirmMarkerPlayer(previous:MarkerPlayerControl, selection:Mark
 /** Applies only a fresh detector result paired with the pose snapshot from its submitted capture. */
 export function observeMarkerFrame(control:MarkerPlayerControl, input:{frame:MarkerFrame;candidates:PlayerCandidate[];now:number}):MarkerPlayerControl {
   const {frame,candidates,now}=input;
-  if(stale(control,frame,now))return control;
+  if(!Number.isFinite(frame.capturedAt)||frame.capturedAt>now||frame.generation!==control.generation||(control.lastSequence!==undefined&&frame.sequence<=control.lastSequence))return control;
+  if(now-frame.capturedAt>MARKER_RESULT_MAX_AGE_MS)return control.latched?clearRecovery(control,now):control;
   const next={...control,lastSequence:frame.sequence};
   if(next.markerId===undefined)return next;
+  if(next.latched&&next.recoveryNotBefore!==undefined&&frame.capturedAt<=next.recoveryNotBefore)return next;
   const selected=frame.markers.filter(marker=>marker.id===next.markerId);
   if(selected.length>1)return stop(next,"duplicate","duplicate",now);
   if(selected.length===1){
     const association=associateMarkers(selected,candidates)[0];
     if(association.association==="ambiguous")return stop(next,"ambiguous","ambiguous",now);
     if(association.association!=="matched"||!association.candidateId)return stop(next,"reconfirm");
-    if(next.latched)return next;
-    const candidate=candidates.find(item=>item.id===association.candidateId);
-    if(!candidate)return stop(next,"reconfirm");
+    const matchingCandidates=candidates.filter(item=>item.id===association.candidateId),candidate=matchingCandidates[0];
+    if(matchingCandidates.length!==1||!candidate)return stop(next,"reconfirm");
+    if(next.latched)return recoverLatched(next,selected[0],candidate,frame,now);
     if(next.candidateId!==undefined&&candidate.id!==next.candidateId)return stop(next,"ambiguous","ambiguous",now);
     if(next.signature&&next.markerSignature&&(!isContinuousBody(next.signature,candidate)||!sameMarkerTorso(next.markerSignature,selected[0],candidate)))return stop(next,"ambiguous","ambiguous",now);
     return bind(next,selected[0],candidate,frame,now);
   }
+  if(next.latched)return clearRecovery(next,now);
   const continued=observeMarkerContinuity(next,{candidates,now});
   return continued.phase==="tracking"?{...continued,phase:"occluded"}:continued;
 }
 
 /** Handles marker occlusion using one unambiguous geometrically-continuous body only. */
 export function observeMarkerContinuity(control:MarkerPlayerControl,input:{candidates:PlayerCandidate[];now:number}):MarkerPlayerControl {
+  if(control.latched){
+    const recovery=control.recovery;
+    if(!recovery)return control;
+    if(input.now-recovery.lastPoseAt>MARKER_CONTINUITY_MAX_GAP_MS)return clearRecovery(control,input.now);
+    const candidates=input.candidates.filter(candidate=>candidate.id===recovery.candidateId);
+    if(candidates.length!==1||!isContinuousBody(recovery.lastPoseSignature,candidates[0])||input.candidates.some(candidate=>candidate.id!==recovery.candidateId&&torsosOverlap(candidates[0],candidate)))return clearRecovery(control,input.now);
+    const signature=bodySignature(candidates[0]);
+    return signature?{...control,recovery:{...recovery,lastPoseSignature:signature,lastPoseAt:input.now}}:clearRecovery(control,input.now);
+  }
   if(control.phase!=="tracking"&&control.phase!=="occluded")return control;
   if(!control.signature||control.markerId===undefined||control.latched)return control.latched?control:stop(control,"reconfirm","continuity",input.now);
   if(control.lastPoseAt===undefined||input.now-control.lastPoseAt>MARKER_CONTINUITY_MAX_GAP_MS)return stop(control,"reconfirm","continuity",input.now);
