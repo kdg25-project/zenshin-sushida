@@ -1,25 +1,26 @@
 declare const WebSocketPair: any;
+import { DEFAULT_PLAYER_ZONE, isPlayerZone, type PlayerZone } from "../lib/player-zone";
 
 /** Per-display transient coordination. Controllers request commands and wait
  * for a display acknowledgement; camera, game, and ranking secrets stay PC-side. */
 export type BoothPhase = "menu" | "camera" | "ready" | "countdown" | "playing" | "result";
-export type BoothCommandKind = "set-name" | "prepare" | "start" | "skip" | "submit" | "next";
-export type BoothSnapshot = { revision:number; round:number; wordIndex:number; phase:BoothPhase; name:string; cameraMessage:string; remaining:number; score:number; currentSushi:string; currentLetter:string; rankingEligible:boolean; submitted:boolean; registrationMessage:string; hostSeenAt:number; controllerCount:number };
-export type BoothCommand = { id:string; kind:BoothCommandKind; round:number; word?:number; name?:string; createdAt:number; expiresAt:number };
+export type BoothCommandKind = "set-name" | "prepare" | "start" | "skip" | "submit" | "next" | "set-player-zone";
+export type BoothSnapshot = { revision:number; round:number; wordIndex:number; phase:BoothPhase; name:string; cameraMessage:string; remaining:number; score:number; currentSushi:string; currentLetter:string; rankingEligible:boolean; submitted:boolean; registrationMessage:string; hostSeenAt:number; controllerCount:number; playerZone:PlayerZone; playerTracking:string };
+export type BoothCommand = { id:string; kind:BoothCommandKind; round:number; word?:number; name?:string; playerZone?:PlayerZone; createdAt:number; expiresAt:number };
 type Complete = { at:number; status:"done"|"rejected"; code:string; message:string };
 type Room = { code:string; hostToken:string; nonce:string; expiresAt:number; snapshot:BoothSnapshot; controllers:Record<string,number>; pending?:BoothCommand; completed:Record<string,Complete>; joins:number[]; activeHost?:string };
 type Attachment = { role:"pending"|"host"|"controller"; nonce?:string; token?:string; connectionId?:string; deadline?:number };
 
 const HOURS_12=12*60*60*1000, HOST_STALE=6_000, COMMAND_TTL=8_000, CONTROLLER_TTL=70_000, AUTH_DEADLINE=8_000, MAX_CONTROLLERS=12, MAX_SOCKETS=16;
 const phases:BoothPhase[]=["menu","camera","ready","countdown","playing","result"];
-const kinds:BoothCommandKind[]=["set-name","prepare","start","skip","submit","next"];
+const kinds:BoothCommandKind[]=["set-name","prepare","start","skip","submit","next","set-player-zone"];
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const constantTime=(a:string,b:string)=>{if(a.length!==b.length)return false;let changed=0;for(let i=0;i<a.length;i++)changed|=a.charCodeAt(i)^b.charCodeAt(i);return changed===0;};
 const validToken=(value:unknown):value is string=>typeof value==="string"&&value.length>=32&&value.length<=160;
 const validId=(value:unknown):value is string=>typeof value==="string"&&/^[a-zA-Z0-9_-]{12,80}$/.test(value);
 const randomId=()=>crypto.randomUUID()+crypto.randomUUID();
 const read=async<T>(request:Request)=>{try{return await request.json() as T;}catch{return undefined;}};
-const allowed=(kind:BoothCommandKind,s:BoothSnapshot)=>kind==="set-name"?["menu","camera","ready"].includes(s.phase):kind==="prepare"?["menu","camera"].includes(s.phase):kind==="start"?s.phase==="ready":kind==="skip"?s.phase==="playing":kind==="submit"?s.phase==="result"&&s.rankingEligible&&!s.submitted:kind==="next";
+const allowed=(kind:BoothCommandKind,s:BoothSnapshot)=>kind==="set-name"||kind==="set-player-zone"?["menu","camera","ready"].includes(s.phase):kind==="prepare"?["menu","camera"].includes(s.phase):kind==="start"?s.phase==="ready":kind==="skip"?s.phase==="playing":kind==="submit"?s.phase==="result"&&s.rankingEligible&&!s.submitted:kind==="next";
 
 export class BoothRoom {
   constructor(private state:any) {}
@@ -41,7 +42,6 @@ export class BoothRoom {
   private complete(room:Room,command:BoothCommand,status:"done"|"rejected",code:string,message:string){room.completed[command.id]={at:Date.now(),status,code,message};room.pending=undefined;this.broadcast({type:"command-result",id:command.id,...room.completed[command.id]});}
   private invalidatePending(room:Room,code:string,message:string){if(room.pending)this.complete(room,room.pending,"rejected",code,message);}
   private async revoke(room?:Room,reason="session ended"){if(room)this.broadcast({type:"session-ended",message:"この操作セッションは終了しました"});this.closeAll(1008,reason);await this.state.storage.deleteAll();}
-
   async fetch(request:Request){
     const url=new URL(request.url),now=Date.now();let room=await this.get();
     if(url.pathname==="/create"&&request.method==="POST"){
@@ -49,7 +49,7 @@ export class BoothRoom {
       if(!body||typeof body.code!=="string"||!/^[a-f0-9]{64}$/.test(body.code)||!validToken(body.hostToken))return json({error:"開始情報が不正です"},400);
       if(room&&room.expiresAt>now)return json({error:"この表示セッションは既に使われています"},409);
       if(room)await this.revoke(room,"expired");
-      const snapshot:BoothSnapshot={revision:1,round:1,wordIndex:0,phase:"menu",name:"",cameraMessage:"表示PCの準備を待っています",remaining:60,score:0,currentSushi:"",currentLetter:"",rankingEligible:false,submitted:false,registrationMessage:"",hostSeenAt:0,controllerCount:0};
+      const snapshot:BoothSnapshot={revision:1,round:1,wordIndex:0,phase:"menu",name:"",cameraMessage:"表示PCの準備を待っています",remaining:60,score:0,currentSushi:"",currentLetter:"",rankingEligible:false,submitted:false,registrationMessage:"",hostSeenAt:0,controllerCount:0,playerZone:DEFAULT_PLAYER_ZONE,playerTracking:"カメラを準備してください"};
       room={code:body.code,hostToken:body.hostToken,nonce:randomId(),expiresAt:now+HOURS_12,snapshot,controllers:{},completed:{},joins:[]};await this.put(room);return json({snapshot});
     }
     if(!room||room.expiresAt<=now){if(room)await this.revoke(room,"expired");return json({error:"この操作セッションは終了しました"},410);}
@@ -79,7 +79,7 @@ export class BoothRoom {
     if(attachment.role==="host"){
       if(attachment.connectionId!==room.activeHost){socket.close(4001,"replaced");return;}
       if(input?.type==="end-session"){if(!validId(input.id)){socket.close(1008,"invalid end");return;}this.send(socket,{type:"command-result",id:input.id,status:"done",code:"SESSION_ENDED",message:"スタッフ操作を終了しました"});await this.revoke(room);return;}
-      if(input?.type==="snapshot"){const s=input.snapshot as BoothSnapshot;if(!s||!Number.isInteger(s.round)||!Number.isInteger(s.wordIndex)||!phases.includes(s.phase)||typeof s.name!=="string"||s.name.length>20){socket.close(1008,"invalid state");return;}if(room.pending&&room.pending.round!==s.round)this.invalidatePending(room,"ROUND_CHANGED","画面が変わったため、この操作は取り消されました");room.snapshot={...s,revision:room.snapshot.revision+1,hostSeenAt:now,controllerCount:Object.keys(room.controllers).length};await this.put(room);this.broadcast(this.stateMessage(room,now));return;}
+      if(input?.type==="snapshot"){const s=input.snapshot as BoothSnapshot;if(!s||!Number.isInteger(s.round)||!Number.isInteger(s.wordIndex)||!phases.includes(s.phase)||typeof s.name!=="string"||s.name.length>20||!isPlayerZone(s.playerZone)||typeof s.playerTracking!=="string"||s.playerTracking.length>100){socket.close(1008,"invalid state");return;}if(room.pending&&room.pending.round!==s.round)this.invalidatePending(room,"ROUND_CHANGED","画面が変わったため、この操作は取り消されました");room.snapshot={...s,revision:room.snapshot.revision+1,hostSeenAt:now,controllerCount:Object.keys(room.controllers).length};await this.put(room);this.broadcast(this.stateMessage(room,now));return;}
       if(input?.type==="ack"){if(room.pending&&input.id===room.pending.id){const status=input.status==="done"?"done":"rejected",code=typeof input.code==="string"?input.code.slice(0,48):status==="done"?"DONE":"REJECTED",message=typeof input.message==="string"?input.message.slice(0,100):"操作を完了できませんでした";this.complete(room,room.pending,status,code,message);await this.put(room);}return;}
       socket.close(1008,"not allowed");return;
     }
@@ -90,8 +90,9 @@ export class BoothRoom {
     if(kind!=="skip"&&input.revision!==room.snapshot.revision){this.reject(socket,id,"STALE_STATE","画面が変わりました。最新の状態を確認してください");return;}
     if(kind==="skip"&&(!Number.isInteger(input.targetIndex)||input.targetIndex!==room.snapshot.wordIndex)){this.reject(socket,id,"STALE_DISH","すでに次のおすしへ進んでいます");return;}
     if(kind==="set-name"&&(typeof input.name!=="string"||input.name.trim().length<1||input.name.trim().length>20)){this.reject(socket,id,"INVALID_NAME","名前は1〜20文字で入力してください");return;}
+    if(kind==="set-player-zone"&&!isPlayerZone(input.playerZone)){this.reject(socket,id,"INVALID_PLAYER_ZONE","プレイ位置の設定が不正です");return;}
     if(room.pending){if(room.pending.id===id)this.send(socket,{type:"command-received",id});else this.reject(socket,id,"COMMAND_BUSY","ほかの操作を反映中です");return;}
-    room.pending={id,kind,round:input.round,word:kind==="skip"?input.targetIndex:undefined,name:kind==="set-name"?input.name.trim():undefined,createdAt:now,expiresAt:now+COMMAND_TTL};await this.put(room);for(const target of this.sockets()){const auth=this.attachment(target);if(auth?.role==="host"&&auth.connectionId===room.activeHost)this.send(target,{type:"command",...room.pending});}this.send(socket,{type:"command-received",id});
+    room.pending={id,kind,round:input.round,word:kind==="skip"?input.targetIndex:undefined,name:kind==="set-name"?input.name.trim():undefined,playerZone:kind==="set-player-zone"?input.playerZone:undefined,createdAt:now,expiresAt:now+COMMAND_TTL};await this.put(room);for(const target of this.sockets()){const auth=this.attachment(target);if(auth?.role==="host"&&auth.connectionId===room.activeHost)this.send(target,{type:"command",...room.pending});}this.send(socket,{type:"command-received",id});
   }
 
   async webSocketClose(socket:any){const room=await this.get(),attachment=this.attachment(socket);if(!room||!attachment)return;const now=Date.now();if(attachment.role==="host"&&attachment.nonce===room.nonce&&attachment.connectionId===room.activeHost){room.activeHost=undefined;this.invalidatePending(room,"HOST_DISCONNECTED","表示PCとの接続が切れました");await this.put(room);this.broadcast(this.stateMessage(room,now));return;}if(attachment.role==="controller"&&attachment.token)room.controllers[attachment.token]=now-CONTROLLER_TTL-1;this.clean(room,now);await this.put(room);}

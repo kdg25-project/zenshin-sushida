@@ -1,7 +1,8 @@
 export type BoothPhase = "menu" | "camera" | "ready" | "countdown" | "playing" | "result";
-export type BoothCommandKind = "set-name" | "prepare" | "start" | "skip" | "submit" | "next";
-export type BoothSnapshot = { revision:number; round:number; wordIndex:number; phase:BoothPhase; name:string; cameraMessage:string; remaining:number; score:number; currentSushi:string; currentLetter:string; rankingEligible:boolean; submitted:boolean; registrationMessage:string; hostSeenAt:number; controllerCount:number };
-export type BoothCommand = { id:string; kind:BoothCommandKind; round:number; word?:number; name?:string; createdAt:number; expiresAt:number };
+export type BoothCommandKind = "set-name" | "prepare" | "start" | "skip" | "submit" | "next" | "set-player-zone";
+import type { PlayerZone } from "./player-zone";
+export type BoothSnapshot = { revision:number; round:number; wordIndex:number; phase:BoothPhase; name:string; cameraMessage:string; remaining:number; score:number; currentSushi:string; currentLetter:string; rankingEligible:boolean; submitted:boolean; registrationMessage:string; hostSeenAt:number; controllerCount:number; playerZone:PlayerZone; playerTracking:string };
+export type BoothCommand = { id:string; kind:BoothCommandKind; round:number; word?:number; name?:string; playerZone?:PlayerZone; createdAt:number; expiresAt:number };
 export type BoothCredentials = { password?:string; roomId?:string; hostToken?:string; controllerToken?:string };
 const endpoint=(path:string)=>`/api/booth${path}`;
 export const randomControlToken=()=>crypto.randomUUID()+crypto.randomUUID();

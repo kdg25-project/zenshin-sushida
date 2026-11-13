@@ -14,6 +14,11 @@ describe("PC booth command guard",()=>{
     expect(validateBoothExecution(command({round:3}),state(),new Map())).toMatchObject({code:"ROUND_CHANGED"});
     expect(validateBoothExecution(command(),state({phase:"result"}),new Map())).toMatchObject({code:"NOT_PLAYING"});
   });
+  it("rejects malformed or active player-zone changes even if an old server snapshot forwarded them",()=>{
+    const zone={minX:.2,maxX:.8,minY:.2,maxY:.8,minScale:.1};
+    expect(validateBoothExecution({...command({kind:"set-player-zone" as any}),playerZone:{...zone,minX:.9,maxX:.1}},state(),new Map())).toMatchObject({code:"INVALID_PLAYER_ZONE"});
+    expect(validateBoothExecution({...command({kind:"set-player-zone" as any}),playerZone:zone},state({phase:"playing"}),new Map())).toMatchObject({code:"PLAYER_ZONE_LOCKED"});
+  });
   it("returns a cached result exactly once across reconnect delivery",()=>{
     const completed=new Map<string,{at:number;result:BoothExecutionResult}>(),done={ok:true,code:"SKIPPED",message:"寿司をスキップしました"};
     rememberBoothExecution(completed,"skip-command-0001",done,150);

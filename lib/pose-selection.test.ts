@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { describePose, resolvePoseSelection, selectPose, type PoseSelection } from "./pose-selection";
+import { describePose, resolvePlayerZone, type PoseSelection } from "./pose-selection";
+import { DEFAULT_PLAYER_ZONE } from "./player-zone";
 import type { Landmark } from "./pose";
 
 function person(x:number,scale=.12): Landmark[] {
@@ -9,28 +10,29 @@ function person(x:number,scale=.12): Landmark[] {
   return landmarks;
 }
 describe("pose selection",()=>{
-  it("requires an explicit choice for multiple people and numbers them left-to-right",()=>{
-    const result=resolvePoseSelection({explicit:false},[person(.75),person(.25)]);
-    expect(result.reason).toBe("choose"); expect(result.poses.map(item=>item.descriptor.x)).toEqual([.25,.75]);
+  const selection:PoseSelection={explicit:false};
+  it("ignores people outside the floor-marker zone and small people behind the player",()=>{
+    expect(resolvePlayerZone(selection,[person(.5,.16),person(.9,.2),person(.5,.05)],DEFAULT_PLAYER_ZONE).selected?.descriptor.x).toBeCloseTo(.5);
   });
-  it("keeps the selected person when detector order reverses",()=>{
-    const initial=resolvePoseSelection({explicit:false},[person(.25),person(.75)]);
-    const selection=selectPose(initial.poses,2)!;
-    const next=resolvePoseSelection(selection,[person(.73),person(.27)]);
-    expect(next.selected?.descriptor.x).toBeCloseTo(.73); expect(next.selected?.number).toBe(2);
+  it("pauses for multiple eligible people and automatically recovers after they leave",()=>{
+    expect(resolvePlayerZone(selection,[person(.45),person(.55)],DEFAULT_PLAYER_ZONE).reason).toBe("ambiguous");
+    const resumed=resolvePlayerZone(selection,[person(.5)],DEFAULT_PLAYER_ZONE);
+    expect(resumed.selected?.descriptor.x).toBeCloseTo(.5);
   });
-  it("does not substitute a bystander when the selected person is missing",()=>{
-    const selection:PoseSelection={explicit:true,descriptor:describePose(person(.2))!};
-    const result=resolvePoseSelection(selection,[person(.8)]);
-    expect(result.selected).toBeUndefined(); expect(result.reason).toBe("missing");
+  it("recovers after a long zero-detection gap without requiring a click",()=>{
+    expect(resolvePlayerZone(selection,[],DEFAULT_PLAYER_ZONE).reason).toBe("missing");
+    expect(resolvePlayerZone(selection,[person(.5)],DEFAULT_PLAYER_ZONE).selected).toBeTruthy();
   });
-  it("fails closed when crossing people are spatially ambiguous",()=>{
-    const selection:PoseSelection={explicit:true,descriptor:describePose(person(.5))!};
-    const result=resolvePoseSelection(selection,[person(.47),person(.53)]);
-    expect(result.selected).toBeUndefined(); expect(result.reason).toBe("ambiguous");
+  it("does not replace an established player with a distant person in the marked area",()=>{
+    const established:PoseSelection={explicit:false,descriptor:describePose(person(.3,.18))!};
+    expect(resolvePlayerZone(established,[person(.7,.075)],DEFAULT_PLAYER_ZONE).reason).toBe("missing");
+    expect(resolvePlayerZone(established,[person(.31,.17)],DEFAULT_PLAYER_ZONE).selected).toBeTruthy();
   });
-  it("requires a new click after a lost/ambiguous target has been latched",()=>{
-    const selection:PoseSelection={explicit:true,descriptor:describePose(person(.5))!,blocked:true};
-    expect(resolvePoseSelection(selection,[person(.5)]).reason).toBe("reselect");
+  it("does not depend on detector ordering",()=>{
+    expect(resolvePlayerZone(selection,[person(.9),person(.5)],DEFAULT_PLAYER_ZONE).selected?.descriptor.x).toBeCloseTo(.5);
+  });
+  it("ignores a low-visibility torso instead of treating it as a second player",()=>{
+    const ghost=person(.55); ghost[11].visibility=.2;
+    expect(resolvePlayerZone(selection,[person(.5),ghost],DEFAULT_PLAYER_ZONE).selected?.descriptor.x).toBeCloseTo(.5);
   });
 });
