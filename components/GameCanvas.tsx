@@ -15,6 +15,7 @@ import { drawSushiPlate, drawWordmark, loadSushiArt, type SushiArtAssets } from 
 import { drawable, loadSfUiAssets, type SfUiAssets } from "../lib/sf-ui-assets";
 import { drawRankingCrown } from "../lib/ranking-crown";
 import { drawRankingBadge, drawRankingPager, drawSourceRankingCrown, rankingBadgeVisualRect } from "../lib/ranking-pagination";
+import { measureCameraWork } from "../lib/camera-profile";
 import { GameScene, MatchBadge } from "./reference-scenes/GameScene";
 import { MenuScene } from "./reference-scenes/MenuScene";
 import { RankingScene } from "./reference-scenes/RankingScene";
@@ -31,6 +32,8 @@ type Props = {
   /** UI clock supplied by GameClient; it never changes engine scoring or control timing. */
   presentationNow?: number;
   simulation: boolean; rankingEligible: boolean; cameraCalibrated: boolean; cameraStarting: boolean; cameraFailed: boolean; cameraMessage: string; landmarks?: Landmark[]; detectedPoses: DetectedPose[]; rankStarting: boolean;
+  /** Monotonic capture time paired atomically with the displayed raw landmarks. */
+  poseCapturedAt?: number;
   ranking: RankEntry[]; rankingStatus: "loading" | "ready" | "error"; rankingPage: number; rankMessage: string; rankError?: string; submitting: boolean;
   videoRef: RefObject<HTMLVideoElement | null>; poseCanvasRef: RefObject<HTMLCanvasElement | null>;
   onNameChange(name: string): void; onOpenCamera(): void; onPractice(): void; onRankings(): void; onOpenPoseList(): void; onOpenStaffSettings(): void; onBackMenu(): void;
@@ -428,13 +431,16 @@ export function GameCanvas(props: Props) {
     const ctx = canvas.getContext("2d");
     if (!ctx) { host.dataset.rendererStatus = "fallback"; setStatus("fallback"); canvas.remove(); return; }
     const portrait = layoutMode === "portrait", gate = new SushiSceneFrameGate(), media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let disposed = false, hidden = document.hidden, offscreen = false, reduced = media.matches, animationFrame = 0, width = 1, height = 1;
+    let disposed = false, hidden = document.hidden, offscreen = false, reduced = media.matches, animationFrame = 0, width = 1, height = 1, lastOverlayPaintAt:number|undefined;
     let observer: ResizeObserver | undefined, intersection: IntersectionObserver | undefined, viewportForCanvas = fitGameViewport(width, height, portrait);
     const render = (time: number, force = false) => {
       if (disposed || (!force && !gate.shouldRender(time))) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
       const transform = canvasBackingTransform(viewportForCanvas, dpr); ctx.setTransform(transform.scale, 0, 0, transform.scale, transform.x, transform.y);
-      paintGame(ctx, assetsRef.current, referenceAssetsRef.current, stateRef.current, phaseFor(stateRef.current), portrait, reduced ? 0 : time, !reduced);
+      const snapshot=stateRef.current;
+      paintGame(ctx, assetsRef.current, referenceAssetsRef.current, snapshot, phaseFor(snapshot), portrait, reduced ? 0 : time, !reduced);
+      // This is callback-to-first-canvas-paint CPU age only, not sensor, GPU, or compositor latency.
+      if(Number.isFinite(snapshot.poseCapturedAt)&&snapshot.poseCapturedAt!==lastOverlayPaintAt){measureCameraWork("sushida:pose-overlay-first-paint-age",snapshot.poseCapturedAt!);lastOverlayPaintAt=snapshot.poseCapturedAt;}
     };
     const stopLoop = () => { if (animationFrame) cancelAnimationFrame(animationFrame); animationFrame = 0; };
     const loop = (time: number) => { render(time); animationFrame = gate.animated ? requestAnimationFrame(loop) : 0; };
