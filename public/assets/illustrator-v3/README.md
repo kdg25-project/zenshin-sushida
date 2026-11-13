@@ -16,15 +16,10 @@ all live DOM/Canvas. The ticket frame had only its explicit `Japanese`,
 The three tile assets are one-character done/current/normal frames and can be
 repeated for any word length at the manifest's tile pitch.
 
-`menu-input-source-clean.png` retains the original nickname caption, frame,
-and pencil. Its placeholder was cleared only from the measured PDF text bbox,
-so the real input must be placed on the remaining white bed. Pose-panel PNGs
-retain their fixed source captions; do not draw duplicate captions over them.
-
-`menu-start-source-tight.png` is the exception: it is a transparent native
-Illustrator group export, padded to its 1150×250 source rectangle. This avoids
-the PDF renderer's vertical seam while leaving the documented wood background
-visible outside the button artwork.
+The menu runtime now uses the v4 source contract in
+`public/assets/illustrator-v4-menu/`; v3 menu crops are intentionally not
+retained here. Pose-panel PNGs retain their fixed source captions; do not draw
+duplicate captions over them.
 
 The four static top-belt sushi regions in `ranking-stage-textless.png` are
 likewise native source overlays at their original pixels. They replace only

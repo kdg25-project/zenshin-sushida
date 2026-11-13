@@ -95,14 +95,15 @@ export function conveyorLaneWords<T>(previous: T | undefined, upcoming: readonly
 }
 
 export const gameRects = {
-  // Measured from the supplied 1920x1080 menu artwork after it is fitted to 1200x675.
-  // Mask only the baked placeholder text; the pencil and ornate border stay visible.
-  name: { x: 357, y: 284, width: 421, height: 36 },
-  menuCamera: { x: 250, y: 371, width: 700, height: 136 },
-  // The supplied tea pot is the demo entry; include the steam and cup in its hit area.
-  menuPractice: { x: 1060, y: 440, width: 110, height: 200 },
-  menuRanking: { x: 202, y: 541, width: 380, height: 77 },
-  menuPoseList: { x: 618, y: 541, width: 380, height: 77 },
+  // Menu v4 source coordinates (1920×1080) fitted exactly to the 1200×675 stage.
+  // The editable region is only the clean crop's white bed; its label and pencil remain source art.
+  name: { x: 347.5, y: 316.25, width: 450, height: 42.5 },
+  menuCamera: { x: 240.625, y: 388.75, width: 718.75, height: 150.625 },
+  // The supplied tea is the demo entry; the complete steam-and-cup source bounds are clickable.
+  menuPractice: { x: 1063.75, y: 448.125, width: 100.625, height: 190 },
+  menuRanking: { x: 188.75, y: 546.25, width: 403.75, height: 98.75 },
+  menuPoseList: { x: 605, y: 546.25, width: 403.75, height: 98.75 },
+  menuStaff: { x: 43.125, y: 548.75, width: 130, height: 92.5 },
   calibrationStart: { x: 330, y: 490, width: 330, height: 48 },
   calibrationBack: { x: 680, y: 490, width: 220, height: 48 },
   gameSkip: { x: 190, y: 624, width: 330, height: 34 },
@@ -131,6 +132,7 @@ export const compactGameRects = {
   menuPractice: { x: 210, y: 548, width: 780, height: 145 },
   menuRanking: { x: 210, y: 710, width: 780, height: 70 },
   menuPoseList: { x: 900, y: 25, width: 230, height: 110 },
+  menuStaff: { x: 90, y: 820, width: 280, height: 180 },
   camera: { x: 60, y: 220, width: 1080, height: 270 },
   calibrationStart: { x: 95, y: 555, width: 650, height: 145 },
   calibrationBack: { x: 770, y: 555, width: 335, height: 145 },
@@ -153,12 +155,13 @@ export const PORTRAIT_WIDTH = 600;
 export const PORTRAIT_HEIGHT = 1000;
 export const portraitGameRects = {
   ...gameRects,
-  name: { x: 65, y: 199, width: 406, height: 35 },
-  menuCamera: { x: 37, y: 267, width: 526, height: 108 },
-  // Preserve the tea pot's 161×304 source aspect in the portrait free area.
-  menuPractice: { x: 410, y: 640, width: 130, height: 245 },
-  menuRanking: { x: 60, y: 405, width: 480, height: 99 },
-  menuPoseList: { x: 60, y: 520, width: 480, height: 99 },
+  name: { x: 55, y: 283, width: 430, height: 42 },
+  menuCamera: { x: 30, y: 365, width: 540, height: 113 },
+  // Preserve the source tea's tall silhouette in the dedicated lower menu area.
+  menuPractice: { x: 415, y: 790, width: 105, height: 198 },
+  menuRanking: { x: 60, y: 520, width: 480, height: 118 },
+  menuPoseList: { x: 60, y: 655, width: 480, height: 118 },
+  menuStaff: { x: 45, y: 820, width: 140, height: 100 },
   camera: { x: 30, y: 190, width: 540, height: 290 },
   target: { x: 30, y: 505, width: 540, height: 300 },
   calibrationStart: { x: 48, y: 570, width: 315, height: 86 },

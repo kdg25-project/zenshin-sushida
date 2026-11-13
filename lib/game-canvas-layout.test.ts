@@ -153,8 +153,8 @@ describe("game canvas layout", () => {
     expect(cssRect(gameRects.menuCamera, viewport).height).toBe(gameRects.menuCamera.height);
   });
 
-  it("keeps the supplied menu's input and three visible actions disjoint", () => {
-    const visible = [gameRects.menuCamera, gameRects.menuRanking, gameRects.menuPoseList];
+  it("keeps the v4 source input bed and the native menu actions disjoint", () => {
+    const visible = [gameRects.menuCamera, gameRects.menuRanking, gameRects.menuPoseList, gameRects.menuPractice, gameRects.menuStaff];
     for (const rect of visible) {
       expect(rectsOverlap(gameRects.name, rect)).toBe(false);
       expect(rect.x).toBeGreaterThanOrEqual(0);
@@ -165,14 +165,23 @@ describe("game canvas layout", () => {
   });
 
   it("maps the supplied tea pot to the demo action without covering primary menu controls", () => {
-    expect(gameRects.menuPractice).toEqual({ x:1060, y:440, width:110, height:200 });
-    expect(portraitGameRects.menuPractice).toEqual({ x:410, y:640, width:130, height:245 });
+    expect(gameRects.menuPractice).toEqual({ x:1063.75, y:448.125, width:100.625, height:190 });
+    expect(portraitGameRects.menuPractice).toEqual({ x:415, y:790, width:105, height:198 });
     for (const [tea, primary] of [[gameRects.menuPractice, gameRects.menuPoseList], [portraitGameRects.menuPractice, portraitGameRects.menuPoseList]] as const) {
       expect(rectsOverlap(tea, primary)).toBe(false);
     }
     const portraitTea = cssRect(portraitGameRects.menuPractice, fitGameViewport(390, 844));
     expect(portraitTea.width).toBeGreaterThanOrEqual(44);
     expect(portraitTea.height).toBeGreaterThanOrEqual(44);
+  });
+
+  it("maps the v4 plate stack to a distinct staff action in both menu compositions", () => {
+    expect(gameRects.menuStaff).toEqual({ x:43.125, y:548.75, width:130, height:92.5 });
+    expect(portraitGameRects.menuStaff).toEqual({ x:45, y:820, width:140, height:100 });
+    for (const [staff, tea, start] of [[gameRects.menuStaff, gameRects.menuPractice, gameRects.menuCamera], [portraitGameRects.menuStaff, portraitGameRects.menuPractice, portraitGameRects.menuCamera]] as const) {
+      expect(rectsOverlap(staff, tea)).toBe(false);
+      expect(rectsOverlap(staff, start)).toBe(false);
+    }
   });
 
   it("uses one stable viewport-width predicate at the responsive boundaries", () => {
@@ -227,7 +236,7 @@ describe("game canvas layout", () => {
   });
 
   it("keeps desktop action hit areas and long-word tiles within the reference scene", () => {
-    for (const rect of [gameRects.menuCamera, gameRects.menuPractice, gameRects.menuRanking, gameRects.menuPoseList, gameRects.gameSkip, gameRects.resultRetry, gameRects.resultMenu, gameRects.rankingBack, gameRects.rankingRefresh]) {
+    for (const rect of [gameRects.menuCamera, gameRects.menuPractice, gameRects.menuRanking, gameRects.menuPoseList, gameRects.menuStaff, gameRects.gameSkip, gameRects.resultRetry, gameRects.resultMenu, gameRects.rankingBack, gameRects.rankingRefresh]) {
       expect(rect.x).toBeGreaterThanOrEqual(0); expect(rect.y).toBeGreaterThanOrEqual(0);
       expect(rect.x + rect.width).toBeLessThanOrEqual(GAME_WIDTH); expect(rect.y + rect.height).toBeLessThanOrEqual(GAME_HEIGHT);
     }
