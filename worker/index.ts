@@ -57,6 +57,11 @@ async function api(request:Request, env:Env){
     const allowed=new Set(["/create","/join"]);
     const suffix=booth[1]||"";
     const origin=request.headers.get("origin");if(origin&&origin!==url.origin)return json({error:"別のサイトからは操作できません"},403);
+    if(suffix==="/reset-ranking"){
+      const room=url.searchParams.get("room"),hostToken=request.headers.get("x-booth-host");
+      if(request.method!=="POST"||!room||!hostToken)return json({error:"接続情報が不正です"},400);
+      try{return env.BOOTH_SESSIONS.get(env.BOOTH_SESSIONS.idFromString(room)).fetch(new Request("https://booth.internal/reset-ranking",{method:"POST",headers:{"x-booth-host":hostToken}}));}catch{return json({error:"接続情報が不正です"},400);}
+    }
     if(suffix==="/ws"){
       const room=url.searchParams.get("room");if(request.method!=="GET"||request.headers.get("upgrade")?.toLowerCase()!=="websocket"||!room||room.length>128)return json({error:"接続情報が不正です"},400);
       try{return env.BOOTH_SESSIONS.get(env.BOOTH_SESSIONS.idFromString(room)).fetch(new Request("https://booth.internal/ws",request));}catch{return json({error:"接続情報が不正です"},400);}

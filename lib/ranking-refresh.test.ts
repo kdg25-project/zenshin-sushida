@@ -39,6 +39,18 @@ describe("ranking refresh controller", () => {
     request.resolve(["stale"]);await settle();expect(rows).toEqual([]);
   });
 
+  it("replaces an in-flight refresh so reset rows cannot restore a stale leaderboard", async () => {
+    const stale=deferred<string[]>(), rows:string[][]=[];
+    const load=vi.fn().mockReturnValueOnce(stale.promise).mockResolvedValueOnce([]);
+    const controller=new RankingRefreshController<string>(load as (signal:AbortSignal)=>Promise<string[]>,{begin:vi.fn(),rows:value=>rows.push(value),failure:vi.fn()});
+    const initial=controller.refresh("manual");
+    const staleSignal=load.mock.calls[0]![0] as AbortSignal;
+    await controller.refreshNow();
+    expect(staleSignal.aborted).toBe(true);
+    stale.resolve(["before-reset"]);await initial;await settle();
+    expect(rows).toEqual([[]]);
+  });
+
   it("keeps an empty successful snapshot through a background failure and recovers an initial error manually", async () => {
     vi.useFakeTimers();
     const begin:string[]=[], failures:Array<[string,boolean]>=[], rows:string[][]=[];

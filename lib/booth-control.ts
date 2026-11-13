@@ -18,3 +18,12 @@ export async function boothRequest<T>(path:string, credentials:BoothCredentials,
   if(!response.ok)throw new Error(data?.error??"通信に失敗しました");
   return data;
 }
+
+/** Resets a booth's rankings with the host token already held by the display. */
+export async function resetBoothRanking(credentials:BoothCredentials) {
+  if(!credentials.roomId||!credentials.hostToken)throw new Error("スタッフ操作の接続を確認してください");
+  const response=await fetch(`${endpoint("/reset-ranking")}?room=${encodeURIComponent(credentials.roomId)}`,{method:"POST",headers:{"x-booth-host":credentials.hostToken},cache:"no-store"});
+  const data=await response.json().catch(()=>undefined) as {deleted?:number;error?:string}|undefined;
+  if(!response.ok)throw new Error(data?.error??"ランキングをリセットできませんでした");
+  return {deleted:typeof data?.deleted==="number"?data.deleted:0};
+}

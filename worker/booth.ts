@@ -28,7 +28,7 @@ export class BoothRoom {
    * proves that a controller click belongs to the current host connection. */
   private previewFrames=new Map<string,Array<{frameId:number;markerCandidates:Set<string>;receivedAt:number}>>();
   private previewSentAt=new Map<string,number>();
-  constructor(private state:any) {}
+  constructor(private state:any,private env:any) {}
   private async get(){return await this.state.storage.get("room") as Room|undefined;}
   private async put(room:Room){await this.state.storage.put("room",room);await this.schedule(room);}
   private sockets(){return this.state.getWebSockets() as any[];}
@@ -61,6 +61,18 @@ export class BoothRoom {
     }
     if(!room||room.expiresAt<=now){if(room)await this.revoke(room,"expired");return json({error:"この操作セッションは終了しました"},410);}
     this.clean(room,now);
+    if(url.pathname==="/reset-ranking"&&request.method==="POST"){
+      const hostToken=request.headers.get("x-booth-host");
+      if(!validToken(hostToken)||!constantTime(hostToken,room.hostToken))return json({error:"表示PCのスタッフ接続を確認してください"},403);
+      if(!this.liveHost(room,now))return json({error:"表示PCとの接続を確認してからランキングをリセットしてください"},409);
+      try{
+        const resetAt=Date.now(),results=await this.env.DB.batch([
+          this.env.DB.prepare("UPDATE game_sessions SET consumed_at=? WHERE consumed_at IS NULL AND started_at<=?").bind(resetAt,resetAt),
+          this.env.DB.prepare("DELETE FROM leaderboard_entries").bind(),
+        ]);
+        return json({deleted:results[1]?.meta?.changes??0});
+      }catch{return json({error:"ランキングをリセットできませんでした。もう一度お試しください"},503);}
+    }
     if(url.pathname==="/join"&&request.method==="POST"){
       const body=await read<{code?:unknown;controllerToken?:unknown}>(request);
       if(!body||body.code!==room.code||!validToken(body.controllerToken))return json({error:"接続IDを確認してください"},404);

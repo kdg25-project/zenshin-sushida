@@ -78,6 +78,12 @@ export class RankingRefreshController<T> {
     });
   }
 
+  /** Starts a foreground refresh after discarding any in-flight stale rows. */
+  refreshNow() {
+    this.invalidate();
+    return this.refresh("manual");
+  }
+
   private current(request: number, reason: RankingRefreshReason) {
     return this.sequence === request && (reason !== "background" || this.active && this.visible);
   }
