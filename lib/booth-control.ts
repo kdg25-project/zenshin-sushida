@@ -6,7 +6,7 @@ export type BoothCommand = { id:string; kind:BoothCommandKind; round:number; wor
 export type BoothCredentials = { password?:string; roomId?:string; hostToken?:string; controllerToken?:string };
 const endpoint=(path:string)=>`/api/booth${path}`;
 export const randomControlToken=()=>crypto.randomUUID()+crypto.randomUUID();
-export const passwordError=(password:string)=>password.trim().length<8||password.trim().length>64?"操作用パスワードは8〜64文字で入力してください":undefined;
+export const passwordError=(password:string)=>password.trim()?undefined:"操作用パスワードを入力してください";
 export async function boothRequest<T>(path:string, credentials:BoothCredentials, init:RequestInit={}) {
   if(!credentials.password)throw new Error("操作用パスワードを確認してください");
   const headers=new Headers(init.headers);headers.set("x-booth-password",credentials.password.trim());

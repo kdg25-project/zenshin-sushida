@@ -28,6 +28,18 @@ async function nextState(inbox: ReturnType<typeof messages>, matches: (value: Sn
 function snapshot(partial: Partial<Snapshot> = {}): Snapshot { return { revision: 0, round: 1, phase: "menu", name: "", cameraMessage: "ready", remaining: 60, score: 0, currentSushi: "", currentLetter: "", wordIndex: 0, rankingEligible: false, submitted: false, registrationMessage: "", hostSeenAt: Date.now(), controllerCount: 0, playerZone: { minX:.2,maxX:.8,minY:.18,maxY:.88,minScale:.075 }, playerTracking: "追跡中", ...partial }; }
 
 describe("booth WebSocket coordination", () => {
+  it("accepts one-character and long nonblank passwords for create and join, but rejects blanks", async () => {
+    const mf = await worker();
+    try {
+      for(const [index, value] of ["a", "x".repeat(256)].entries()) {
+        const token = `${index}`.repeat(48), controller = `${index + 2}`.repeat(48);
+        const created = await post(mf, "/api/booth/create", { hostToken: token }, { "x-booth-password": value });
+        expect(created.status).toBe(200);
+        expect((await post(mf, "/api/booth/join", { controllerToken: controller }, { "x-booth-password": value })).status).toBe(200);
+      }
+      expect((await post(mf, "/api/booth/create", { hostToken }, { "x-booth-password": " \t " })).status).toBe(401);
+    } finally { await mf.dispose(); }
+  });
 
   it("creates a password-scoped room once, returns only an opaque room locator, and rejects cross-origin joins", async () => {
     const mf = await worker();

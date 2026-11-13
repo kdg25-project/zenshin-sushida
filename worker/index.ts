@@ -63,7 +63,7 @@ async function api(request:Request, env:Env){
     }
     if(!allowed.has(suffix))return json({error:"見つかりません"},404);
     const password=request.headers.get("x-booth-password")?.trim();
-    if(!password||password.length<8||password.length>64)return json({error:"操作用パスワードを確認してください"},401);
+    if(!password)return json({error:"操作用パスワードを入力してください"},401);
     if(suffix==="/create"||suffix==="/join"){
       const client=request.headers.get("cf-connecting-ip")??"anonymous";
       if(!(await env.BOOTH_PASSWORD_ATTEMPTS.limit({key:await hash(`booth-rate:v1:${client}`)})).success)return json({error:"接続が集中しています。少し待ってください"},429);
