@@ -5,6 +5,13 @@ export type PoseQuality={joints:Record<JointName,JointQuality>;missing:JointName
 
 export function assessPoseQuality(landmarks:Landmark[]|undefined):PoseQuality{
   const joints={} as Record<JointName,JointQuality>,missing:JointName[]=[],soft:JointName[]=[];
+  // A missing pose is not evidence that every joint is out of frame. This is
+  // especially important while identity association is still pending: callers
+  // must not turn "no selected candidate" into a false shoulder warning.
+  if(!landmarks?.length){
+    for(const name of REQUIRED_JOINTS)joints[name]="missing";
+    return {joints,missing,soft,ready:false,hint:"骨格を検出しています…"};
+  }
   for(const name of REQUIRED_JOINTS){const point=landmarks?.[INDEX[name]],edge=!!point&&(point.x<.02||point.x>.98||point.y<.02||point.y>.98);const outside=!!point&&(point.x<-.04||point.x>1.04||point.y<-.04||point.y>1.04);const visibility=point?.visibility??1;const quality=!point||!Number.isFinite(point.x)||!Number.isFinite(point.y)||visibility<.35||outside?"missing":visibility<.55||edge?"soft":"reliable";joints[name]=quality;if(quality==="missing")missing.push(name);else if(quality==="soft")soft.push(name);}
   const label=(joint:JointName)=>({leftShoulder:"左肩",rightShoulder:"右肩",leftElbow:"左ひじ",rightElbow:"右ひじ",leftWrist:"左手",rightWrist:"右手",leftHip:"左腰",rightHip:"右腰",leftKnee:"左ひざ",rightKnee:"右ひざ",leftAnkle:"左足首",rightAnkle:"右足首"}[joint]);
   return {joints,missing,soft,ready:missing.length===0&&soft.length<=2,hint:missing.length?`${missing.slice(0,2).map(label).join("・")}をカメラに入れてください`:soft.length?`${soft.slice(0,2).map(label).join("・")}が端に近いです。少し中央へ`:"準備できました"};
