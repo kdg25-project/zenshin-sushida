@@ -1,8 +1,8 @@
 export type BoothPhase = "menu" | "camera" | "ready" | "countdown" | "playing" | "result";
-export type BoothCommandKind = "set-name" | "prepare" | "start" | "skip" | "submit" | "next" | "reconfirm-player";
+export type BoothCommandKind = "set-name" | "prepare" | "start" | "skip" | "solve-letter" | "submit" | "next" | "reconfirm-player";
 export type MarkerTrackingPhase = "unselected"|"tracking"|"marker-occluded"|"reconfirm-required"|"duplicate"|"ambiguous";
-export type BoothSnapshot = { revision:number; round:number; wordIndex:number; phase:BoothPhase; name:string; cameraMessage:string; remaining:number; score:number; currentSushi:string; currentLetter:string; rankingEligible:boolean; submitted:boolean; registrationMessage:string; hostSeenAt:number; controllerCount:number; playerTracking:string; selectionRequired:boolean; selectedMarkerId?:number; markerTrackingPhase?:MarkerTrackingPhase; markerMessage?:string; markerSelectionGeneration?:number; reconfirmationRequired?:boolean };
-export type BoothCommand = { id:string; kind:BoothCommandKind; round:number; word?:number; name?:string; frameId?:number; markerSelectionGeneration?:number; createdAt:number; expiresAt:number };
+export type BoothSnapshot = { revision:number; round:number; targetIndex:number; wordIndex:number; letterIndex:number; phase:BoothPhase; name:string; cameraMessage:string; remaining:number; score:number; currentSushi:string; currentLetter:string; rankingEligible:boolean; submitted:boolean; registrationMessage:string; hostSeenAt:number; controllerCount:number; playerTracking:string; selectionRequired:boolean; selectedMarkerId?:number; markerTrackingPhase?:MarkerTrackingPhase; markerMessage?:string; markerSelectionGeneration?:number; reconfirmationRequired?:boolean };
+export type BoothCommand = { id:string; kind:BoothCommandKind; round:number; word?:number; targetIndex?:number; wordIndex?:number; letterIndex?:number; name?:string; frameId?:number; markerSelectionGeneration?:number; createdAt:number; expiresAt:number };
 export type BoothCredentials = { password?:string; roomId?:string; hostToken?:string; controllerToken?:string };
 const endpoint=(path:string)=>`/api/booth${path}`;
 export const randomControlToken=()=>crypto.randomUUID()+crypto.randomUUID();

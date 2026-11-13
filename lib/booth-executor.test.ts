@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { rememberBoothExecution, validateBoothExecution, type BoothExecutionResult } from "./booth-executor";
 
 const command=(overrides:Partial<{id:string;kind:"skip";round:number;word:number;createdAt:number;expiresAt:number}>={})=>({id:"skip-command-0001",kind:"skip" as const,round:4,word:8,createdAt:100,expiresAt:200,...overrides});
-const state=(overrides:Partial<{round:number;wordIndex:number;phase:"camera"|"ready"|"countdown"|"playing"|"result";selectedMarkerId:number;markerSelectionGeneration:number;selectionRequired:boolean;reconfirmationRequired:boolean;now:number}>={})=>({round:4,wordIndex:8,phase:"playing" as const,now:150,...overrides});
+const state=(overrides:Partial<{round:number;targetIndex:number;wordIndex:number;letterIndex:number;phase:"camera"|"ready"|"countdown"|"playing"|"result";selectedMarkerId:number;markerSelectionGeneration:number;selectionRequired:boolean;reconfirmationRequired:boolean;now:number}>={})=>({round:4,targetIndex:23,wordIndex:8,letterIndex:2,phase:"playing" as const,now:150,...overrides});
 
 describe("PC booth command guard",()=>{
   it("allows a skip after letters advance within the same sushi but rejects an old dish",()=>{
@@ -13,6 +13,12 @@ describe("PC booth command guard",()=>{
     expect(validateBoothExecution(command({expiresAt:149}),state(),new Map())).toMatchObject({code:"COMMAND_EXPIRED"});
     expect(validateBoothExecution(command({round:3}),state(),new Map())).toMatchObject({code:"ROUND_CHANGED"});
     expect(validateBoothExecution(command(),state({phase:"result"}),new Map())).toMatchObject({code:"NOT_PLAYING"});
+  });
+  it("accepts only the exact displayed letter and rejects a delayed duplicate",()=>{
+    const letter={id:"letter-command-0001",kind:"solve-letter" as const,round:4,targetIndex:23,wordIndex:8,letterIndex:2,createdAt:100,expiresAt:200};
+    expect(validateBoothExecution(letter,state(),new Map())).toBeUndefined();
+    expect(validateBoothExecution(letter,state({letterIndex:3,targetIndex:24}),new Map())).toMatchObject({code:"STALE_LETTER"});
+    expect(validateBoothExecution(letter,state({phase:"result"}),new Map())).toMatchObject({code:"NOT_PLAYING"});
   });
   it("permits only a latched, generation-bound reconfirmation for a printed marker",()=>{
     const reconfirm={id:"reconfirm-player-0001",kind:"reconfirm-player" as const,round:4,frameId:5,markerSelectionGeneration:3,createdAt:100,expiresAt:200};

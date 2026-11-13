@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, advanceTime, beginPlaying, completedPlates, createSession, currentTemplate, currentWordProgress, gameResult, matchPose, matchTargetPose, normalizeLandmarks, observe, skipTarget, syntheticLandmarks, upcomingWords, type GameSession } from "./engine";
+import { DEFAULT_CONFIG, advanceTime, beginPlaying, completedPlates, createSession, currentTemplate, currentWordProgress, gameResult, matchPose, matchTargetPose, normalizeLandmarks, observe, skipTarget, solveCurrentLetterManually, syntheticLandmarks, upcomingWords, type GameSession } from "./engine";
 import { INDEX, POSE_TEMPLATES, REQUIRED_JOINTS, type JointName, type Landmark, type NormalizedPose, type Point } from "./pose";
 import { ROMAJI_ALPHABET, SUSHI_WORDS, sushiWord, wordSequence } from "./sushi-words";
 import { A_POSE_MATCH_MARGIN, G_POSE_MATCH_MARGIN, O_POSE_MATCH_MARGIN, POSE_TEMPLATE_VERSION, RULES_KEY, S_POSE_MATCH_MARGIN, serializeRelativeEventTime } from "./game-rules";
@@ -246,6 +246,18 @@ describe("game engine",()=>{
   expect(rejected.successes).toHaveLength(0);
  });
  it("ends at deadline, rejects later scores, and skip resets combo only",()=>{let game=advanceTime(beginPlaying(createSession(),0,rng),3500);for(const at of [3500,3600,3700,3800,3900])game=observe(game,at,.95,true);expect(game.combo).toBe(1);const score=game.score;game={...game,combo:3}; const before=game.score;game={...game,status:"playing"}; game=observe(game,(game.startedAt??0)+60_000,.99,true);expect(game.status).toBe("result");expect(game.score).toBe(before);expect(score).toBeGreaterThan(0);});
+ it("records one staff-confirmed letter with the normal replay-safe score event",()=>{
+  let game:GameSession={...createSession(),status:"playing",startedAt:1_000,order:["ebi","uni"],wordIndex:0,letterIndex:0,targetIndex:0};
+  expect(solveCurrentLetterManually(game,1_399)).toBe(game);
+  game=solveCurrentLetterManually(game,1_400);
+  expect(game).toMatchObject({targetIndex:1,wordIndex:0,letterIndex:1,score:184,combo:1,lastAccuracy:DEFAULT_CONFIG.threshold,holdSince:undefined});
+  expect(game.events).toEqual([{kind:"solve",targetIndex:0,templateId:"E",wordId:"ebi",wordIndex:0,letterIndex:0,at:1_400,accuracy:DEFAULT_CONFIG.threshold}]);
+  expect(solveCurrentLetterManually(game,1_799)).toBe(game);
+  game=solveCurrentLetterManually(game,1_800);
+  game=solveCurrentLetterManually(game,2_200);
+  expect(game).toMatchObject({wordIndex:1,letterIndex:0,targetIndex:3,combo:3,completedWordIds:["ebi"]});
+  expect(game.events.map(event=>[event.at,event.templateId,event.targetIndex])).toEqual([[1_400,"E",0],[1_800,"B",1],[2_200,"I",2]]);
+ });
  it("commits one queue for the target and lane across fresh, seeded, and long boundaries",()=>{
   const seeded=beginPlaying(createSession(),0,rng,0),sameSeed=beginPlaying(createSession(),0,()=>.9,0),otherSeed=beginPlaying(createSession(),0,rng,1);
   expect(seeded.orderSeed).toBe(0);expect(seeded.order.slice(0,200)).toEqual(wordSequence(0,200));expect(sameSeed.order).toEqual(seeded.order);expect(otherSeed.order.slice(0,200)).not.toEqual(seeded.order.slice(0,200));

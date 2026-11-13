@@ -178,21 +178,35 @@ export function beginPlaying(session:GameSession, now:number, random:()=>number=
 }
 export function advanceTime(session:GameSession, now:number):GameSession { if(session.status==="countdown"&&now>=(session.countdownUntil??now)) return {...session,status:"playing",startedAt:now,holdSince:undefined,lastFrameAt:undefined}; if(session.status==="playing"&&now>=(session.startedAt??now)+session.config.durationMs) return {...session,status:"result",endedAt:now,holdSince:undefined}; return session; }
 export function scoreFor(accuracy:number, combo:number){ return Math.round(100+accuracy*100+Math.min(combo,20)*12); }
+function recordSolve(session:GameSession, now:number, accuracy:number):GameSession {
+  const word=currentWord(session), targetId=word.romaji[session.letterIndex] as RomajiLetter;
+  const combo=session.combo+1, points=scoreFor(accuracy,combo);
+  const success: SolveEvent={templateId:targetId,wordId:word.id,wordIndex:session.wordIndex,letterIndex:session.letterIndex,at:now,accuracy,combo,points};
+  const isLastLetter=session.letterIndex===word.romaji.length-1;
+  const next=isLastLetter ? advanceWord(session,Math.random) : {order:session.order,wordIndex:session.wordIndex,letterIndex:session.letterIndex+1};
+  return {...session,...next,targetIndex:session.targetIndex+1,used:[...session.used,targetId],completedWordIds:isLastLetter?[...session.completedWordIds,word.id]:session.completedWordIds,score:session.score+points,combo,maxCombo:Math.max(session.maxCombo,combo),successes:[...session.successes,success],events:[...session.events,{kind:"solve",targetIndex:session.targetIndex,templateId:targetId,wordId:word.id,wordIndex:session.wordIndex,letterIndex:session.letterIndex,at:now,accuracy}],holdSince:undefined,lastTemplateId:targetId};
+}
 /** `displayedAccuracy` is intentionally independent of acceptance: an ambiguous but detected pose still updates the meter. */
 export function observe(session:GameSession, now:number, accuracy:number, accepted=true, displayedAccuracy=accepted&&Number.isFinite(accuracy)?accuracy:0):GameSession {
   const progressed=advanceTime(session,now); if(progressed.status!=="playing") return progressed;
   const frameGap=progressed.lastFrameAt===undefined?0:now-progressed.lastFrameAt;
-  const word=currentWord(progressed), targetId=word.romaji[progressed.letterIndex] as RomajiLetter;
   const matches=accepted&&Number.isFinite(accuracy)&&accuracy>=progressed.config.threshold&&frameGap<=progressed.config.maxFrameGapMs;
   const base={...progressed,lastFrameAt:now,lastAccuracy:Number.isFinite(displayedAccuracy)?displayedAccuracy:0};
   if(!matches) return {...base,holdSince:undefined};
   const holdSince=base.holdSince===undefined?now:base.holdSince;
   if(now-holdSince<base.config.holdMs) return {...base,holdSince};
-  const combo=base.combo+1, points=scoreFor(accuracy,combo);
-  const success: SolveEvent={templateId:targetId,wordId:word.id,wordIndex:base.wordIndex,letterIndex:base.letterIndex,at:now,accuracy,combo,points};
-  const isLastLetter=base.letterIndex===word.romaji.length-1;
-  const next=isLastLetter ? advanceWord(base,Math.random) : {order:base.order,wordIndex:base.wordIndex,letterIndex:base.letterIndex+1};
-  return {...base,...next,targetIndex:base.targetIndex+1,used:[...base.used,targetId],completedWordIds:isLastLetter?[...base.completedWordIds,word.id]:base.completedWordIds,score:base.score+points,combo,maxCombo:Math.max(base.maxCombo,combo),successes:[...base.successes,success],events:[...base.events,{kind:"solve",targetIndex:base.targetIndex,templateId:targetId,wordId:word.id,wordIndex:base.wordIndex,letterIndex:base.letterIndex,at:now,accuracy}],holdSince:undefined,lastTemplateId:targetId};
+  return recordSolve(base,now,accuracy);
+}
+/**
+ * Records the displayed letter after a staff member confirms a detector miss.
+ * The same solve record and minimum event interval as camera solves keep the
+ * ranking replay contract intact without assigning a fabricated high score.
+ */
+export function solveCurrentLetterManually(session:GameSession, now:number):GameSession {
+  const progressed=advanceTime(session,now); if(progressed.status!=="playing") return progressed;
+  const previousAt=progressed.events.at(-1)?.at??progressed.startedAt??now;
+  if(now-previousAt<progressed.config.holdMs) return progressed;
+  return recordSolve({...progressed,lastAccuracy:progressed.config.threshold,holdSince:undefined},now,progressed.config.threshold);
 }
 /** Skips the entire current sushi dish. Earned letters stay scored, but no plate is completed. */
 export function skipTarget(session:GameSession, now:number):GameSession {

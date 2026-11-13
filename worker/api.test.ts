@@ -7,6 +7,7 @@ import { RANKING_SUBMISSION_TTL_MS, RULES_KEY } from "../lib/game-rules";
 import { serializeRelativeEventTime } from "../lib/game-rules";
 import { createRankingSubmission, isRankingReceipt } from "../lib/ranking-submission";
 import { sushiWord } from "../lib/sushi-words";
+import { advanceTime, beginPlaying, createSession, solveCurrentLetterManually } from "../lib/engine";
 import { validateEvents, wordSequence } from "./index";
 
 const schema = ["0001_leaderboard.sql", "0002_session_seed.sql"].map(file => readFileSync(resolve(process.cwd(), "migrations", file), "utf8")).join("\n");
@@ -33,6 +34,26 @@ describe("D1 ranking API", () => {
     const seed=0,skips=Array.from({length:200},(_,wordIndex)=>event(seed,wordIndex,0,wordIndex*100,"skip"));
     expect(validateEvents(skips,seed)).toMatchObject({solved:0,completedPlates:0});
     expect(validateEvents([...skips,{...skips[0],at:20_000}],seed)).toBeUndefined();
+  });
+
+  it("accepts replay events created by staff-confirmed letters", async () => {
+    const mf = await worker();
+    try {
+      expect((await mf.dispatchFetch("http://local.test/__test/setup")).status).toBe(200);
+      const game = await (await post(mf, "/api/games", { rulesKey: RULES_KEY, simulation: false })).json() as StartedGame;
+      const startedAt=10_000;
+      let round=advanceTime(beginPlaying(createSession(),startedAt,()=>.1,game.seed),startedAt+3_500);
+      round=solveCurrentLetterManually(round,startedAt+3_900);
+      round=solveCurrentLetterManually(round,startedAt+4_300);
+      expect(round.events).toHaveLength(2);
+      expect(round.events.every(item=>item.kind==="solve"&&item.accuracy===.72)).toBe(true);
+      const response=await post(mf,`/api/games/${game.id}/submit`,createRankingSubmission("staff",round,RULES_KEY),game.token);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({solved:2,maxCombo:2});
+      const afterDeadline=solveCurrentLetterManually({...round,status:"playing"},startedAt+3_500+60_000);
+      expect(afterDeadline).toMatchObject({status:"result",score:round.score,events:round.events});
+      expect(solveCurrentLetterManually(createSession(),startedAt+4_000)).toEqual(createSession());
+    } finally { await mf.dispose(); }
   });
 
   it("replays current supplied-dish words, derives letters/plates, and rejects forged positions", async () => {

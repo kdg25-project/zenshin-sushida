@@ -5,7 +5,7 @@ import { Miniflare } from "miniflare";
 import { encodePreview } from "../lib/booth-preview";
 
 type Socket = { accept: () => void; close: (code?: number, reason?: string) => void; send: (message: string|ArrayBuffer) => void; addEventListener: (type: "message" | "close", listener: (event: { data?: string|ArrayBuffer; code?: number }) => void) => void };
-type Snapshot = { revision: number; round: number;  wordIndex: number;  phase: "menu" | "camera" | "ready" | "countdown" | "playing" | "result"; name: string; cameraMessage: string; remaining: number; score: number; currentSushi: string; currentLetter: string; rankingEligible: boolean; submitted: boolean; registrationMessage: string; hostSeenAt: number; controllerCount: number; playerTracking:string; selectionRequired:boolean;selectedMarkerId?:number;markerTrackingPhase?:"unselected"|"tracking"|"marker-occluded"|"reconfirm-required"|"duplicate"|"ambiguous";markerMessage?:string;markerSelectionGeneration?:number;reconfirmationRequired?:boolean };
+type Snapshot = { revision: number; round: number; targetIndex:number; wordIndex: number; letterIndex:number; phase: "menu" | "camera" | "ready" | "countdown" | "playing" | "result"; name: string; cameraMessage: string; remaining: number; score: number; currentSushi: string; currentLetter: string; rankingEligible: boolean; submitted: boolean; registrationMessage: string; hostSeenAt: number; controllerCount: number; playerTracking:string; selectionRequired:boolean;selectedMarkerId?:number;markerTrackingPhase?:"unselected"|"tracking"|"marker-occluded"|"reconfirm-required"|"duplicate"|"ambiguous";markerMessage?:string;markerSelectionGeneration?:number;reconfirmationRequired?:boolean };
 
 const password = "festival-test-password";
 const hostToken = "h".repeat(48);
@@ -26,7 +26,7 @@ async function connect(mf: Miniflare, roomId: string) { const response = await m
 function messages(socket: Socket) { const values: unknown[] = [], waiters: Array<(value: unknown) => void> = []; socket.addEventListener("message", event => { if(typeof event.data!=="string")return;const value = JSON.parse(event.data); const waiter = waiters.shift(); if(waiter) waiter(value); else values.push(value); }); const next = () => values.length ? Promise.resolve(values.shift()) : new Promise<unknown>(resolve => waiters.push(resolve)); const nextType = async (type: string) => { for(;;) { const value = await next() as { type?: string }; if(value.type === type) return value as Record<string, unknown>; } }; return { nextType }; }
 async function authenticate(socket: Socket, inbox: ReturnType<typeof messages>, token: string) { socket.send(JSON.stringify({ type: "authenticate", token })); return await inbox.nextType("state") as { snapshot: Snapshot }; }
 async function nextState(inbox: ReturnType<typeof messages>, matches: (value: Snapshot) => boolean) { for(;;) { const value = await inbox.nextType("state") as { snapshot: Snapshot }; if(matches(value.snapshot)) return value.snapshot; } }
-function snapshot(partial: Partial<Snapshot> = {}): Snapshot { return { revision: 0, round: 1, wordIndex: 0, phase: "menu", name: "", cameraMessage: "ready", remaining: 60, score: 0, currentSushi: "", currentLetter: "", rankingEligible: false, submitted: false, registrationMessage: "", hostSeenAt: Date.now(), controllerCount: 0, playerTracking: "追跡中", selectionRequired:false, ...partial }; }
+function snapshot(partial: Partial<Snapshot> = {}): Snapshot { return { revision: 0, round: 1, targetIndex:0, wordIndex: 0, letterIndex:0, phase: "menu", name: "", cameraMessage: "ready", remaining: 60, score: 0, currentSushi: "", currentLetter: "", rankingEligible: false, submitted: false, registrationMessage: "", hostSeenAt: Date.now(), controllerCount: 0, playerTracking: "追跡中", selectionRequired:false, ...partial }; }
 
 describe("booth WebSocket coordination", () => {
   it("accepts one-character and long nonblank passwords for create and join, but rejects blanks", async () => {
@@ -125,6 +125,32 @@ describe("booth WebSocket coordination", () => {
       expect(await firstInbox.nextType("command-result")).toMatchObject({ id: "skip-command-stale-1", status: "done" });
       first.send(JSON.stringify({ type: "command", id: "skip-command-stale-2", kind: "skip", round: playing.round, revision: playing.revision, targetIndex: playing.wordIndex - 1 }));
       expect(await firstInbox.nextType("command-result")).toMatchObject({ id: "skip-command-stale-2", status: "rejected" });
+    } finally { await mf.dispose(); }
+  });
+
+  it("forwards one current letter once, then rejects stale same-dish positions", async () => {
+    const mf = await worker();
+    try {
+      const { roomId } = await createRoom(mf);
+      await joinRoom(mf, controllerOne);
+      const host = await connect(mf, roomId), hostInbox = messages(host);
+      const controller = await connect(mf, roomId), controllerInbox = messages(controller);
+      await authenticate(host, hostInbox, hostToken); await authenticate(controller, controllerInbox, controllerOne);
+      host.send(JSON.stringify({ type: "snapshot", snapshot: snapshot({ phase: "playing", targetIndex:31, wordIndex:7, letterIndex:2 }) }));
+      const playing = await nextState(controllerInbox, value => value.phase === "playing" && value.targetIndex === 31);
+      const command = { type:"command", id:"solve-letter-current-0001", kind:"solve-letter", round:playing.round, revision:playing.revision, targetIndex:playing.targetIndex, wordIndex:playing.wordIndex, letterIndex:playing.letterIndex };
+      controller.send(JSON.stringify({ ...command, id:"solve-letter-wrong-00001", letterIndex:1 }));
+      expect(await controllerInbox.nextType("command-result")).toMatchObject({ id:"solve-letter-wrong-00001", status:"rejected", code:"STALE_LETTER" });
+      controller.send(JSON.stringify(command));
+      expect(await hostInbox.nextType("command")).toMatchObject({ id:"solve-letter-current-0001", kind:"solve-letter", targetIndex:31, wordIndex:7, letterIndex:2 });
+      host.send(JSON.stringify({ type:"ack", id:"solve-letter-current-0001", status:"done" }));
+      expect(await controllerInbox.nextType("command-result")).toMatchObject({ id:"solve-letter-current-0001", status:"done" });
+      controller.send(JSON.stringify(command));
+      expect(await controllerInbox.nextType("command-result")).toMatchObject({ id:"solve-letter-current-0001", status:"done" });
+      host.send(JSON.stringify({ type:"snapshot", snapshot:snapshot({ phase:"playing", targetIndex:32, wordIndex:7, letterIndex:3 }) }));
+      const advanced=await nextState(controllerInbox, value => value.targetIndex === 32);
+      controller.send(JSON.stringify({ ...command, id:"solve-letter-stale-00001", revision:advanced.revision }));
+      expect(await controllerInbox.nextType("command-result")).toMatchObject({ id:"solve-letter-stale-00001", status:"rejected", code:"STALE_LETTER" });
     } finally { await mf.dispose(); }
   });
 

@@ -1,7 +1,7 @@
 import type { BoothCommand } from "./booth-control";
 import { isPrintedMarkerId } from "./aruco-types";
 
-export type BoothExecutionState = { round:number; wordIndex:number; phase:"menu"|"camera"|"ready"|"countdown"|"playing"|"result"; selectedMarkerId?:number; markerSelectionGeneration?:number; selectionRequired?:boolean; reconfirmationRequired?:boolean; now:number };
+export type BoothExecutionState = { round:number; targetIndex:number; wordIndex:number; letterIndex:number; phase:"menu"|"camera"|"ready"|"countdown"|"playing"|"result"; selectedMarkerId?:number; markerSelectionGeneration?:number; selectionRequired?:boolean; reconfirmationRequired?:boolean; now:number };
 export type BoothExecutionResult = { ok:boolean; code:string; message:string };
 
 /** Final PC-side guard: the screen may advance between DO receipt and action. */
@@ -18,6 +18,10 @@ export function validateBoothExecution(command:BoothCommand, state:BoothExecutio
   if(command.kind==="skip"){
     if(state.phase!=="playing")return {ok:false,code:"NOT_PLAYING",message:"この操作はできません"};
     if(command.word!==state.wordIndex)return {ok:false,code:"STALE_DISH",message:"すでに次のおすしへ進んでいます"};
+  }
+  if(command.kind==="solve-letter"){
+    if(state.phase!=="playing")return {ok:false,code:"NOT_PLAYING",message:"この操作はできません"};
+    if(command.targetIndex!==state.targetIndex||command.wordIndex!==state.wordIndex||command.letterIndex!==state.letterIndex)return {ok:false,code:"STALE_LETTER",message:"すでに次の文字へ進んでいます"};
   }
   return undefined;
 }
