@@ -176,7 +176,12 @@ function wordTrack(ctx: CanvasRenderingContext2D, progress: SushiWordProgress, x
   letters.forEach((letter, index) => {
     const current = index === progress.letterIndex, done = index < progress.letterIndex, px = x + start + index * (box + gap);
     pixelFrame(ctx, { x:px, y:y - box / 2, width:box, height:box }, done ? "#d1efcd" : current ? "#ffc6c6" : "#fde0b4", current ? "#ef211d" : done ? "#167015" : "#0e1011", portrait ? 5 : 8);
-    text(ctx, letter, px + box / 2, y + 4, Math.round(box * .58), done ? "#147613" : current ? "#f3201e" : "#172a3a", "center", pixelFont);
+    const glyphScaleX = letter === "W" ? .72 : 1;
+    ctx.save();
+    ctx.translate(px + box / 2, y + 4);
+    ctx.scale(glyphScaleX, 1);
+    text(ctx, letter, 0, 0, Math.round(box * .58), done ? "#147613" : current ? "#f3201e" : "#172a3a", "center", pixelFont);
+    ctx.restore();
   });
 }
 function fittedText(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, preferredSize: number, minimumSize: number, maxWidth: number, color: string, family: string) {

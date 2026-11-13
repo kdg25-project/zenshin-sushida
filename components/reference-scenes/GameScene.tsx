@@ -146,7 +146,7 @@ function WordTiles({ letters, letterIndex, compact = false }: { letters: string[
     {letters.map((letter, index) => {
       const state = index < letterIndex ? "done" : index === letterIndex ? "current" : "next";
       const frame = state === "done" ? sceneAssetPaths.gameLetterTileDone : state === "current" ? sceneAssetPaths.gameLetterTileCurrent : sceneAssetPaths.gameLetterTileNormal;
-      return <span key={`${letter}-${index}`} data-state={state}>{!compact ? <img className="game-scene-tile-art" src={frame} alt="" draggable={false} /> : null}<b>{letter}</b></span>;
+      return <span key={`${letter}-${index}`} data-letter={letter} data-state={state}>{!compact ? <img className="game-scene-tile-art" src={frame} alt="" draggable={false} /> : null}<b>{letter}</b></span>;
     })}
   </div>;
 }

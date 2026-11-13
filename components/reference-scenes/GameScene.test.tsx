@@ -36,6 +36,13 @@ describe("GameScene", () => {
     expect(markup).not.toContain("game-sushi-name-tile-frames.svg");
   });
 
+  it("normalizes only the wide W glyph in live letter tiles", () => {
+    const markup = renderToStaticMarkup(<GameScene model={{ ...fixture, word:{ id:"wuty", name:"だぶりゅー", romaji:"WUTY" } }} portrait={false}/>);
+    expect(markup.match(/data-letter=&quot;W&quot;|data-letter=\"W\"/g)).toHaveLength(1);
+    expect(markup).toContain('data-letter="U"');
+    expect(readFileSync(new URL("./game.css", import.meta.url), "utf8")).toContain('.game-scene-tiles span[data-letter="W"]>b{transform:scaleX(.7);transform-origin:center}');
+  });
+
   it("fits a legitimate longer Japanese sushi title without an ellipsis", () => {
     const markup = renderToStaticMarkup(<GameScene model={{ ...fixture, word:{ id:"negitoro", name:"ねぎとろ", romaji:"NEGITORO" } }} portrait={false}/>);
     expect(markup).toContain("ねぎとろ");
