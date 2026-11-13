@@ -1,4 +1,12 @@
 {
+  "aigamo": {
+    "source": "AIGAMO.svg",
+    "sourceSha256": "39656b8a4aa11b5979abb1cfc3cef1f6c30fe96edff03702d88782807756eaa8",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
   "akagai": {
     "source": "AKAGAI.svg",
     "sourceSha256": "ccc6fd7ded7deacf6e966893cdac3f178e6d5f64bc1b24d560c21336dbf9c2e9",
@@ -6,6 +14,22 @@
     "height": 24,
     "alpha": "opaque-or-transparent",
     "mode": "grid"
+  },
+  "amaebi": {
+    "source": "AMAEBI.svg",
+    "sourceSha256": "3033c9e01a994c76dddff41766c4766471ce689548e831a2107b4ddfabe145a3",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "anago": {
+    "source": "ANAGO.svg",
+    "sourceSha256": "3388e4c75bdc0322b7104ec731b1daa1a3b6d7495741867e9cd26c35f42b1103",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
   },
   "binchoumaguro": {
     "source": "BINCHOUMAGURO.svg",
@@ -23,6 +47,30 @@
     "alpha": "opaque-or-transparent",
     "mode": "grid"
   },
+  "ebiabokado": {
+    "source": "EBIABOKADO.svg",
+    "sourceSha256": "03beaeb6eee49646ef797b5258fcea94dc3f75860ca718ee86a65cc9adf2a82a",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "ebitenn": {
+    "source": "EBITENN.svg",
+    "sourceSha256": "6235e4466efa883616c1cd3e97d1718084e12336ebcd63573eb20dc6ebd9968c",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "hamachi": {
+    "source": "HAMACHI.svg",
+    "sourceSha256": "45a43ddd1480704e08beca0ab836941eef937385d5f8e62da6718802519f4f26",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
   "hotate": {
     "source": "HOTATE.svg",
     "sourceSha256": "fbfac03cbcc3d1a4690a3009db2f7e2ed908766d3052c3e809d7053a0f456652",
@@ -30,6 +78,22 @@
     "height": 24,
     "alpha": "opaque-or-transparent",
     "mode": "grid"
+  },
+  "ika": {
+    "source": "IKA.svg",
+    "sourceSha256": "277e94b6be8e82b0d93709433e47101d6bdaeb8f2f76aafe5f7f1e1038b6a68a",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "ikatenn": {
+    "source": "IKATENN.svg",
+    "sourceSha256": "13324e2ff150f60b39bcb9ee10f0d90b7c50115d9542380f6b662f4798adf7ef",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
   },
   "ikura": {
     "source": "IKURA.svg",
@@ -39,17 +103,89 @@
     "alpha": "opaque-or-transparent",
     "mode": "grid"
   },
+  "inarizushi": {
+    "source": "INARIZUSHI.svg",
+    "sourceSha256": "ad1a15a7706fe062d46d94ef1665be965001d8f108a2b4a0d05f50eea20f01e6",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "kappamaki": {
+    "source": "KAPPAMAKI.svg",
+    "sourceSha256": "522b50f0f40fa4a7ab9a7b6b85d4ef5af8409014c26b23fbb837d530e6167948",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "katsuo": {
+    "source": "KATSUO.svg",
+    "sourceSha256": "e4bc859409132a46f00195d0604710b287f40e04b3bed7e66b7491ff096b140a",
+    "width": 301,
+    "height": 211,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "koonn": {
+    "source": "KOONN.svg",
+    "sourceSha256": "55ed99f7ef26c8047fdb5822fbb15d9ffb509abc621d84cd11b5fde076a708e6",
+    "width": 320,
+    "height": 300,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "koontuna": {
+    "source": "KOONTUNA.svg",
+    "sourceSha256": "4c56631b20564e62b2bce7b40c44b897460db78600cd3117c34c3ad8f1d24dbb",
+    "width": 321,
+    "height": 241,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "madai": {
+    "source": "MADAI.svg",
+    "sourceSha256": "e45b4e5d7b2bd2876c80af1e455072590398b7d23d6961b58ab0fa8e4689de27",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
   "maguro": {
     "source": "MAGURO.svg",
-    "sourceSha256": "b974e2fdfc02b729e872039c3234f7d9e610931c7d94d3ca222880c3efe9bf11",
+    "sourceSha256": "4d2b76991aeb49e56fcbfe50216d623b755baedd6f7a53e311d6a9aaa195e31e",
     "width": 32,
     "height": 24,
     "alpha": "opaque-or-transparent",
     "mode": "grid"
   },
+  "magutaku": {
+    "source": "MAGUTAKU.svg",
+    "sourceSha256": "873857ab433c441bd24c3f73837de55a8697136ab8560e810bd8411dbe867775",
+    "width": 320,
+    "height": 300,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "misosiru": {
+    "source": "MISOSIRU.svg",
+    "sourceSha256": "b97ebc9fe36d4bb090d368f876f6c13d4689db0733502d297c52b39e84bbe325",
+    "width": 321,
+    "height": 241,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
   "namaebi": {
     "source": "NAMAEBI.svg",
     "sourceSha256": "65ab52ce26996697a2b5ab2e1aa06fed636bc9f326da2de3dc1c820d1abe5fe9",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "nattoumaki": {
+    "source": "NATTOUMAKI.svg",
+    "sourceSha256": "fa3c25d1ac7c78b06171b71c4fe6f56ac0b5bf363bd5f85f27b5a3e04231522f",
     "width": 320,
     "height": 240,
     "alpha": "opaque-or-transparent",
@@ -62,6 +198,38 @@
     "height": 30,
     "alpha": "opaque-or-transparent",
     "mode": "grid"
+  },
+  "nianago": {
+    "source": "NIANAGO.svg",
+    "sourceSha256": "ac6076c625f470014c542f1acff23db4a1bc397cdc9bb094751aad4f4371d66a",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "pafe": {
+    "source": "PAFE.svg",
+    "sourceSha256": "b8f8a08aec23a8a01f00f34433316d81e4bdd094887c48ee6d430ca9a3cd3c25",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "purin": {
+    "source": "PURIN.svg",
+    "sourceSha256": "e6cfd6597ee72fd316b4cb14f62e68fae38ae484b7a130377214e531b00828ee",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "saamon": {
+    "source": "SAAMON.svg",
+    "sourceSha256": "91435588610b8660d5dca4f5d56a61dd73767384dd998d7d75bb521e47038d53",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
   },
   "saba": {
     "source": "SABA.svg",
@@ -79,9 +247,49 @@
     "alpha": "opaque-or-transparent",
     "mode": "grid"
   },
+  "takuann": {
+    "source": "TAKUANN.svg",
+    "sourceSha256": "f00477dc47e278eb05d96503de9838f3b2878718b5275b5361a28bf00dd47685",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "tamago": {
+    "source": "TAMAGO.svg",
+    "sourceSha256": "f59003b5979e312b2590b16a93dd342653b71d5b6bf74093c99fc7194f1884dc",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
   "tekka": {
     "source": "TEKKAMAKI.svg",
     "sourceSha256": "a5c04ad167e3031d9aa619553a4bd09632e60f33af5ee4fd6f182fca80e9cee7",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "torosaamonn": {
+    "source": "TOROSAAMONN.svg",
+    "sourceSha256": "680b184ec5aa20a2df7af3ec112d63f2bba3c21b72a86f194cffd9cd0145eab1",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "tyawanmusi": {
+    "source": "TYAWANMUSI.svg",
+    "sourceSha256": "967a7b6673ecd4ac94c166688f68d94869cefa25e39a58fcc368b1bb85b5552a",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
+  },
+  "unagi": {
+    "source": "UNAGI.svg",
+    "sourceSha256": "32e0cafb4e61b9d1db6dacd05dffc3c0f57601d6cb3a1e0050521f440b312b53",
     "width": 320,
     "height": 240,
     "alpha": "opaque-or-transparent",
@@ -94,5 +302,13 @@
     "height": 30,
     "alpha": "opaque-or-transparent",
     "mode": "grid"
+  },
+  "wasabinasu": {
+    "source": "WASABINASU.svg",
+    "sourceSha256": "7ccf7ee578b61f8f5080e669123a0279e5a555759e3e3f1a2a73d1e489b8ef0e",
+    "width": 320,
+    "height": 240,
+    "alpha": "opaque-or-transparent",
+    "mode": "native"
   }
 }

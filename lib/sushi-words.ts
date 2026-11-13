@@ -12,6 +12,33 @@ export const SUSHI_WORDS = [
   { id: "maguro", name: "まぐろ", romaji: "MAGURO" },
   { id: "tekka", name: "鉄火巻き", romaji: "TEKKAMAKI" },
   { id: "namaebi", name: "生えび", romaji: "NAMAEBI" },
+  { id: "aigamo", name: "あいがも", romaji: "AIGAMO" },
+  { id: "amaebi", name: "甘えび", romaji: "AMAEBI" },
+  { id: "anago", name: "あなご", romaji: "ANAGO" },
+  { id: "ebitenn", name: "えび天", romaji: "EBITENN" },
+  { id: "hamachi", name: "はまち", romaji: "HAMACHI" },
+  { id: "ika", name: "いか", romaji: "IKA" },
+  { id: "ikatenn", name: "いか天", romaji: "IKATENN" },
+  { id: "katsuo", name: "かつお", romaji: "KATSUO" },
+  { id: "koonn", name: "コーン", romaji: "KOONN" },
+  { id: "koontuna", name: "コーンツナ", romaji: "KOONTUNA" },
+  { id: "magutaku", name: "まぐたく", romaji: "MAGUTAKU" },
+  { id: "misosiru", name: "みそ汁", romaji: "MISOSIRU" },
+  { id: "nattoumaki", name: "納豆巻き", romaji: "NATTOUMAKI" },
+  { id: "nianago", name: "煮あなご", romaji: "NIANAGO" },
+  { id: "saamon", name: "サーモン", romaji: "SAAMON" },
+  { id: "takuann", name: "たくあん", romaji: "TAKUANN" },
+  { id: "tamago", name: "たまご", romaji: "TAMAGO" },
+  { id: "torosaamonn", name: "とろサーモン", romaji: "TOROSAAMONN" },
+  { id: "unagi", name: "うなぎ", romaji: "UNAGI" },
+  { id: "ebiabokado", name: "えびアボカド", romaji: "EBIABOKADO" },
+  { id: "inarizushi", name: "いなり寿司", romaji: "INARIZUSHI" },
+  { id: "kappamaki", name: "かっぱ巻き", romaji: "KAPPAMAKI" },
+  { id: "madai", name: "真鯛", romaji: "MADAI" },
+  { id: "pafe", name: "パフェ", romaji: "PAFE" },
+  { id: "purin", name: "プリン", romaji: "PURIN" },
+  { id: "tyawanmusi", name: "茶碗蒸し", romaji: "TYAWANMUSI" },
+  { id: "wasabinasu", name: "わさびなす", romaji: "WASABINASU" },
 ] as const;
 
 export type SushiWordId = (typeof SUSHI_WORDS)[number]["id"];
@@ -19,7 +46,7 @@ export type SushiWord = (typeof SUSHI_WORDS)[number];
 
 export type SushiWordProgress = { word: SushiWord; wordIndex: number; letterIndex: number };
 
-export const ROMAJI_ALPHABET = ["A", "B", "C", "E", "G", "H", "I", "K", "M", "N", "O", "R", "S", "T", "U"] as const;
+export const ROMAJI_ALPHABET = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "K", "M", "N", "O", "P", "R", "S", "T", "U", "W", "Y", "Z"] as const;
 export type RomajiLetter = (typeof ROMAJI_ALPHABET)[number];
 
 const wordById = new Map<SushiWordId, SushiWord>(SUSHI_WORDS.map(word => [word.id, word]));

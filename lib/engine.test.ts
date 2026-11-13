@@ -3,6 +3,8 @@ import { DEFAULT_CONFIG, advanceTime, beginPlaying, completedPlates, createSessi
 import { INDEX, POSE_TEMPLATES, REQUIRED_JOINTS, type JointName, type Landmark, type NormalizedPose, type Point } from "./pose";
 import { ROMAJI_ALPHABET, SUSHI_WORDS, sushiWord, wordSequence } from "./sushi-words";
 import { A_POSE_MATCH_MARGIN, G_POSE_MATCH_MARGIN, O_POSE_MATCH_MARGIN, POSE_TEMPLATE_VERSION, RULES_KEY, S_POSE_MATCH_MARGIN, serializeRelativeEventTime } from "./game-rules";
+import { fitTargetPose, playGuideTargetRect } from "./game-canvas-layout";
+import { targetHeadRadius } from "./pose-guide";
 
 function rawFixture(joints: Record<number, [number, number]>): Landmark[] {
  const landmarks: Landmark[] = Array.from({ length: 33 }, () => ({ x: .5, y: .5, visibility: 1 }));
@@ -56,7 +58,7 @@ function noisyPose(source: NormalizedPose, seed: number): NormalizedPose {
 describe("pose matcher",()=>{
  it("recognizes every exact provisional pose despite a wide source aspect",()=>{for(const pose of POSE_TEMPLATES){const score=matchPose(syntheticLandmarks(pose,16/9),16/9,pose);expect(score.valid).toBe(true);expect(score.accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);}});
  it("uses exactly the canonical ROMAJI letters and rejects an obviously different pose",()=>{expect(POSE_TEMPLATES.map(pose=>pose.id)).toEqual([...ROMAJI_ALPHABET]);const upright=POSE_TEMPLATES.find(x=>x.id==="M")!, handsDown=POSE_TEMPLATES.find(x=>x.id==="I")!;expect(matchPose(syntheticLandmarks(handsDown),16/9,upright).accuracy).toBeLessThan(DEFAULT_CONFIG.threshold);});
- it("uses the current pose template version and guarded rules in gameplay and leaderboard isolation",()=>{expect(POSE_TEMPLATE_VERSION).toBe("poses-v9");expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(DEFAULT_CONFIG.rulesVersion).toBe("rules-v10");expect(DEFAULT_CONFIG.threshold).toBe(.72);expect(A_POSE_MATCH_MARGIN).toBe(.02);expect(O_POSE_MATCH_MARGIN).toBe(.025);expect(G_POSE_MATCH_MARGIN).toBe(.03);expect(S_POSE_MATCH_MARGIN).toBe(.04);expect(RULES_KEY).toBe(`rules-v10|score-v1|words-v6|${POSE_TEMPLATE_VERSION}|60000|0.72|400|a0.02|o0.025|g0.03|s0.04`);});
+ it("uses the current pose template version and guarded rules in gameplay and leaderboard isolation",()=>{expect(POSE_TEMPLATE_VERSION).toBe("poses-v10");expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(DEFAULT_CONFIG.rulesVersion).toBe("rules-v10");expect(DEFAULT_CONFIG.threshold).toBe(.72);expect(A_POSE_MATCH_MARGIN).toBe(.02);expect(O_POSE_MATCH_MARGIN).toBe(.025);expect(G_POSE_MATCH_MARGIN).toBe(.03);expect(S_POSE_MATCH_MARGIN).toBe(.04);expect(RULES_KEY).toBe(`rules-v10|score-v1|words-v8|${POSE_TEMPLATE_VERSION}|60000|0.72|400|a0.02|o0.025|g0.03|s0.04`);});
  it("keeps C/M/S open, uncrossed silhouettes and the open-right-arm G template",()=>{const c=POSE_TEMPLATES.find(template=>template.id==="C")!,m=POSE_TEMPLATES.find(template=>template.id==="M")!,s=POSE_TEMPLATES.find(template=>template.id==="S")!,g=POSE_TEMPLATES.find(template=>template.id==="G")!;expect(c.pose).toMatchObject({leftElbow:{x:-.8,y:-1.85},leftWrist:{x:.25,y:-2.1},rightElbow:{x:.65,y:-.1},rightWrist:{x:1.55,y:-.1}});expect(c.pose.leftWrist.x).toBeGreaterThan(c.pose.leftElbow.x);expect(c.pose.rightWrist.x).toBeGreaterThan(c.pose.rightElbow.x);expect(m.pose).toMatchObject({leftElbow:{x:-1.2,y:-.5},leftWrist:{x:-.35,y:.4},rightElbow:{x:1.2,y:-.5},rightWrist:{x:.35,y:.4}});expect(m.pose.leftElbow.y).toBeGreaterThan(m.pose.leftShoulder.y);expect(distance(m.pose.leftWrist,m.pose.rightWrist)).toBeGreaterThan(.64);expect(s.pose).toMatchObject({leftElbow:{x:-1.2,y:-.55},leftWrist:{x:-.55,y:-1.5},rightElbow:{x:1.1,y:-.2},rightWrist:{x:.45,y:.4}});expect(s.pose.leftElbow.y).toBeGreaterThan(s.pose.leftShoulder.y);expect(s.pose.rightElbow.y).toBeGreaterThan(s.pose.rightShoulder.y);expect(s.pose.leftWrist.x).toBeLessThan(s.pose.leftShoulder.x);expect(s.pose.rightWrist.x).toBeGreaterThan(s.pose.rightHip.x);expect(g.pose).toMatchObject({leftElbow:{x:-.9,y:-1.35},leftWrist:{x:-.55,y:-1.8},rightElbow:{x:1.3,y:-.7},rightWrist:{x:1.85,y:-.48}});});
  it("keeps every limb in a plausible standing range and preserves key letter silhouettes",()=>{
   for(const template of POSE_TEMPLATES) for(const [start,end] of [["leftShoulder","leftElbow"],["leftElbow","leftWrist"],["rightShoulder","rightElbow"],["rightElbow","rightWrist"],["leftHip","leftKnee"],["leftKnee","leftAnkle"],["rightHip","rightKnee"],["rightKnee","rightAnkle"]] as const) { const length=distance(template.pose[start],template.pose[end]);expect(length,`${template.id}:${start}-${end}`).toBeGreaterThan(.5);expect(length,`${template.id}:${start}-${end}`).toBeLessThan(1.5); }
@@ -70,12 +72,48 @@ describe("pose matcher",()=>{
   expect(H.leftWrist.y).toBeGreaterThan(H.leftElbow.y);expect(H.rightWrist.y).toBeGreaterThan(H.rightElbow.y);expect(Math.abs(H.leftAnkle.x-H.rightAnkle.x)).toBeGreaterThan(1.5);
   expect(M.leftElbow.y).toBeGreaterThan(M.leftShoulder.y);expect(M.leftWrist.y).toBeGreaterThan(M.leftElbow.y);expect(distance(M.leftWrist,M.rightWrist)).toBeGreaterThan(.64);
  });
+ it("keeps the approved D/F/P/W/Y/Z geometry",()=>{
+  const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!.pose;
+  const d=byId("D"),f=byId("F"),p=byId("P"),w=byId("W"),y=byId("Y"),z=byId("Z");
+  expect(d.rightElbow).toMatchObject({x:1.5,y:-1.5});expect(d.rightWrist).toMatchObject({x:1.5,y:-.2});
+  expect(f.rightElbow).toMatchObject({x:1.71,y:-1});expect(f.rightWrist).toMatchObject({x:1.71,y:-2.21});
+  expect(p.rightElbow).toMatchObject({x:1.55,y:-1.5});expect(p.rightWrist).toMatchObject({x:.1,y:-1.85});
+  for(const portrait of [false,true]){const fitted=fitTargetPose(p,playGuideTargetRect(portrait),{left:12,top:12,right:12,bottom:12}),left=fitted.point(p.leftShoulder),right=fitted.point(p.rightShoulder),head=fitted.point(fitted.head),wrist=fitted.point(p.rightWrist);expect(distance(wrist,head)).toBeLessThanOrEqual(targetHeadRadius(left,right));}
+  expect(w.leftElbow.y).toBeGreaterThan(w.leftShoulder.y);expect(w.leftWrist.y).toBeLessThan(w.leftElbow.y);expect(w.rightWrist.x).toBeGreaterThan(w.rightElbow.x);
+  expect(y.leftWrist.y).toBeLessThan(y.leftElbow.y);expect(distance(y.leftWrist,y.rightWrist)).toBeGreaterThan(3);
+  expect(z.leftWrist.y).toBeCloseTo(z.leftShoulder.y);expect(z.rightWrist.y).toBeGreaterThan(z.rightElbow.y);expect(Math.abs(z.leftAnkle.x-z.rightAnkle.x)).toBeGreaterThan(2);
+ });
  it("requires the target to be clearer than every other adopted character",()=>{for(const actual of POSE_TEMPLATES)for(const target of POSE_TEMPLATES)if(actual.id!==target.id){const normalized=normalizeLandmarks(syntheticLandmarks(actual,16/9),16/9).pose!;expect(matchTargetPose(normalized,target,DEFAULT_CONFIG.threshold).accepted,`${actual.character} must not solve ${target.character}`).toBe(false);}});
  it("accepts exact raw frames and the measured 10°/20° natural-bend subsets without accepting a deformed wrong letter",()=>{
   for(const template of POSE_TEMPLATES){const normalized=normalizeLandmarks(rawFromNormalized(template.pose),16/9).pose!;expect(matchTargetPose(normalized,template,DEFAULT_CONFIG.threshold).accepted,template.id).toBe(true);}
   const accepted10=POSE_TEMPLATES.filter(template=>matchTargetPose(normalizedBent(template,10),template,DEFAULT_CONFIG.threshold).accepted),accepted20=POSE_TEMPLATES.filter(template=>matchTargetPose(normalizedBent(template,20),template,DEFAULT_CONFIG.threshold).accepted);
-  expect(accepted10).toHaveLength(15);expect(accepted20).toHaveLength(15);
+  expect(accepted10).toHaveLength(POSE_TEMPLATES.length);expect(accepted20.map(template=>template.id)).toEqual(POSE_TEMPLATES.map(template=>template.id).filter(id=>id!=="P"));
   for(const actual of POSE_TEMPLATES){const normalized=normalizedBent(actual,20);for(const target of POSE_TEMPLATES)if(target.id!==actual.id)expect(matchTargetPose(normalized,target,DEFAULT_CONFIG.threshold).accepted,`${actual.id} must not solve ${target.id}`).toBe(false);}
+ });
+ it("keeps the approved F/P/K forms distinct through realistic bends",()=>{
+  const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
+  const f=byId("F"),p=byId("P"),k=byId("K"),b=byId("B"),d=byId("D"),r=byId("R"),z=byId("Z");
+  expect(matchTargetPose(normalizedBent(f,20),f)).toMatchObject({accepted:true});
+  const pHeadContact: NormalizedPose={...p.pose,rightElbow:{x:1.48,y:-1.45},rightWrist:{x:.12,y:-1.85}};
+  const pActual=normalizeLandmarks(rawFromNormalized(pHeadContact),16/9).pose!;
+  expect(matchTargetPose(pActual,p)).toMatchObject({accepted:true});expect(matchTargetPose(pActual,d).accepted).toBe(false);expect(matchTargetPose(pActual,r).accepted).toBe(false);
+  const p30=normalizedBent(p,30);expect(matchTargetPose(p30,b)).toMatchObject({accepted:false,nearestTemplateId:"P"});
+  const k35=normalizeLandmarks(rawFromNormalized(naturallyBent(k.pose,35)),16/9).pose!;
+  expect(matchTargetPose(k35,k)).toMatchObject({accepted:true});expect(matchTargetPose(k35,z).accepted).toBe(false);
+  expect(matchTargetPose(normalizeLandmarks(rawFromNormalized(z.pose),16/9).pose!,k).accepted).toBe(false);
+  for(const target of [p,k,z]) expect(matchTargetPose(normalizeLandmarks(horizontallyMirrored(rawFromNormalized(target.pose)),16/9).pose!,target).accepted,`${target.id} must reject its mirrored path`).toBe(false);
+ });
+ it("accepts a looser W only when both forearms still rise outward",()=>{
+  const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
+  const w=byId("W"),h=byId("H"),s=byId("S"),u=byId("U"),t=byId("T");
+  const relaxedW: NormalizedPose={...w.pose,leftElbow:{x:-.8,y:-.55},rightElbow:{x:.8,y:-.55},leftWrist:{x:-1.1,y:-.7},rightWrist:{x:1.1,y:-.7}};
+  const actual=normalizeLandmarks(rawFromNormalized(relaxedW),16/9).pose!;
+  expect(matchTargetPose(actual,w)).toMatchObject({accepted:true,nearestTemplateId:"C"});
+  for(const rival of [h,s,t,u]) expect(matchTargetPose(actual,rival).accepted,`relaxed W must not solve ${rival.id}`).toBe(false);
+  expect(matchTargetPose(normalizeLandmarks(horizontallyMirrored(rawFromNormalized(relaxedW)),16/9).pose!,w).accepted).toBe(false);
+  const nearU: NormalizedPose={...u.pose,leftElbow:{x:-1.18,y:-.55},rightElbow:{x:1.18,y:-.55},leftWrist:{x:-1.18,y:-1.57},rightWrist:{x:1.18,y:-1.57}};
+  const nearT: NormalizedPose={...t.pose,leftElbow:{x:-1.3,y:-.55},rightElbow:{x:1.3,y:-.55},leftWrist:{x:-2.1,y:-.55},rightWrist:{x:2.1,y:-.55}};
+  for(const near of [nearU,nearT]) expect(matchTargetPose(normalizeLandmarks(rawFromNormalized(near),16/9).pose!,w).accepted).toBe(false);
  });
  it("accepts independently relaxed C/M/S arms through the raw camera normalization pipeline without solving another letter",()=>{
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
@@ -162,15 +200,16 @@ describe("pose matcher",()=>{
 });
 describe("sushi word catalog",()=>{
  it("contains the canonical dishes, alphabet, and a deterministic balanced deck",()=>{
-  expect(SUSHI_WORDS.map(word=>word.id)).toEqual(["ebi","ikura","uni","tako","saba","akagai","negitoro","hotate","binchoumaguro","maguro","tekka","namaebi"]);
+  expect(SUSHI_WORDS.map(word=>word.id).slice(0,12)).toEqual(["ebi","ikura","uni","tako","saba","akagai","negitoro","hotate","binchoumaguro","maguro","tekka","namaebi"]);
+  expect(SUSHI_WORDS).toHaveLength(39);
   expect(new Set(SUSHI_WORDS.flatMap(word=>[...word.romaji]))).toEqual(new Set(ROMAJI_ALPHABET));
   expect(SUSHI_WORDS.find(word=>word.id==="hotate")).toEqual({id:"hotate",name:"ほたて",romaji:"HOTATE"});
   expect(SUSHI_WORDS.find(word=>word.id==="binchoumaguro")).toEqual({id:"binchoumaguro",name:"びんちょうまぐろ",romaji:"BINCHOUMAGURO"});
   expect(SUSHI_WORDS.find(word=>word.id==="maguro")).toEqual({id:"maguro",name:"まぐろ",romaji:"MAGURO"});
   expect(SUSHI_WORDS.find(word=>word.id==="tekka")).toEqual({id:"tekka",name:"鉄火巻き",romaji:"TEKKAMAKI"});
   expect(SUSHI_WORDS.find(word=>word.id==="namaebi")).toEqual({id:"namaebi",name:"生えび",romaji:"NAMAEBI"});
-  const deck=wordSequence(42,12);expect(deck).toEqual(wordSequence(42,12));expect(new Set(deck).size).toBe(12);
-  const next=wordSequence(42,13);expect(next[11]).not.toBe(next[12]);
+  const deck=wordSequence(42,SUSHI_WORDS.length);expect(deck).toEqual(wordSequence(42,SUSHI_WORDS.length));expect(new Set(deck).size).toBe(SUSHI_WORDS.length);
+  const next=wordSequence(42,SUSHI_WORDS.length+1);expect(next[SUSHI_WORDS.length-1]).not.toBe(next[SUSHI_WORDS.length]);
  });
 });
 describe("game engine",()=>{
@@ -211,7 +250,7 @@ describe("game engine",()=>{
   const seeded=beginPlaying(createSession(),0,rng,0),sameSeed=beginPlaying(createSession(),0,()=>.9,0),otherSeed=beginPlaying(createSession(),0,rng,1);
   expect(seeded.orderSeed).toBe(0);expect(seeded.order.slice(0,200)).toEqual(wordSequence(0,200));expect(sameSeed.order).toEqual(seeded.order);expect(otherSeed.order.slice(0,200)).not.toEqual(seeded.order.slice(0,200));
   const freshA=beginPlaying(createSession(),0,()=>.1),freshB=beginPlaying(createSession(),0,()=>.9);
-  expect(freshA.order.slice(0,12)).not.toEqual(freshB.order.slice(0,12));expect(freshA.order).toHaveLength(24);expect(new Set(freshA.order.slice(0,12)).size).toBe(12);expect(freshA.order[11]).not.toBe(freshA.order[12]);
+  expect(freshA.order.slice(0,SUSHI_WORDS.length)).not.toEqual(freshB.order.slice(0,SUSHI_WORDS.length));expect(freshA.order).toHaveLength(SUSHI_WORDS.length);expect(new Set(freshA.order).size).toBe(SUSHI_WORDS.length);
   let game=advanceTime(seeded,3500);
   for(let index=0;index<=200;index++){
    expect(game.wordIndex).toBe(index);const next=upcomingWords(game,3),advanced=skipTarget(game,3500+index);

@@ -6,7 +6,7 @@ export type MatcherResult = { valid: boolean; accuracy: number; jointScore: numb
 /** A valid camera pose may still be too similar to another ROMAJI silhouette to solve. */
 export type GuardedMatcherResult = MatcherResult & { accepted: boolean; nearestTemplateId?: string; margin?: number };
 export type GameConfig = { durationMs: number; threshold: number; holdMs: number; scoreVersion: string; rulesVersion: string; templateVersion: string; wordVersion: string; maxFrameGapMs: number };
-export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v10", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v6", maxFrameGapMs: 180 };
+export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v10", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v8", maxFrameGapMs: 180 };
 
 const finite = (p: Point | undefined): p is Point => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -92,13 +92,31 @@ function hasRSignature(actual: NormalizedPose) {
 function hasEOutwardRightForearm(actual: NormalizedPose) {
   return limbDirection(actual.rightElbow,actual.rightWrist).x>=.35;
 }
+/** B closes below the shoulder; a raised P hand must not become B after arm relaxation. */
+function hasBLoweredRightHand(actual: NormalizedPose) { return actual.rightWrist.y-actual.rightShoulder.y>=.55; }
+function hasBSignature(actual: NormalizedPose) { return hasBLoweredRightHand(actual)&&actual.rightWrist.x-actual.rightShoulder.x<=.45; }
+function hasPHeadHand(actual: NormalizedPose) { return actual.rightWrist.y-actual.rightShoulder.y<=-.15&&actual.rightElbow.x-actual.rightShoulder.x>=.65; }
+function hasFSignature(actual: NormalizedPose) { return actual.leftWrist.y-actual.leftShoulder.y>=.55&&Math.abs(actual.rightElbow.y-actual.rightShoulder.y)<=.45&&Math.abs(actual.rightWrist.x-actual.rightElbow.x)<=.45&&actual.rightWrist.y-actual.rightShoulder.y<=-.6&&Math.abs(actual.leftAnkle.x-actual.leftHip.x)<=.35&&Math.abs(actual.rightAnkle.x-actual.rightHip.x)<=.35; }
+/** W keeps both elbows below the shoulders while both forearms rise outward. */
+function hasWOutwardForearms(actual: NormalizedPose) {
+  return actual.leftElbow.y-actual.leftShoulder.y>=.4&&actual.rightElbow.y-actual.rightShoulder.y>=.4&&actual.leftWrist.y<=actual.leftElbow.y-.1&&actual.rightWrist.y<=actual.rightElbow.y-.1&&actual.leftElbow.x-actual.leftWrist.x>=.25&&actual.rightWrist.x-actual.rightElbow.x>=.25;
+}
+/** K keeps its left arm lowered while its right hand and foot both point outward. */
+function hasKSignature(actual: NormalizedPose) { return actual.leftWrist.y-actual.leftShoulder.y>=.55&&actual.rightElbow.x-actual.rightShoulder.x>=.45&&actual.rightWrist.y-actual.rightShoulder.y<=-.45&&actual.rightAnkle.x-actual.rightHip.x>=.45; }
 function rivalIsEligible(actual: NormalizedPose, targetId: string, rivalId: string) {
   if(targetId==="M"&&rivalId==="H"&&hasMFoldedForearms(actual)) return hasHForearms(actual);
   if(targetId==="E"&&rivalId==="R"&&hasEOutwardRightForearm(actual)) return hasRSignature(actual);
+  if(targetId==="E"&&rivalId==="F"&&hasEOutwardRightForearm(actual)) return false;
+  if(targetId==="B"&&rivalId==="D"&&hasBSignature(actual)) return false;
+  if(targetId==="P"&&rivalId==="B"&&hasPHeadHand(actual)) return false;
+  if(targetId==="F"&&rivalId==="K"&&hasFSignature(actual)) return false;
+  if(targetId==="F"&&rivalId==="P"&&hasFSignature(actual)) return false;
+  if(targetId==="K"&&(rivalId==="F"||rivalId==="Z")&&hasKSignature(actual)) return false;
+  if(targetId==="W"&&["H","S","T","U"].includes(rivalId)&&hasWOutwardForearms(actual)) return false;
   return true;
 }
 function targetHasRequiredSignature(actual: NormalizedPose, targetId: string) {
-  return targetId!=="H"||hasHForearms(actual) ? targetId!=="R"||hasRSignature(actual) : false;
+  return (targetId!=="H"||hasHForearms(actual))&&(targetId!=="R"||hasRSignature(actual))&&(targetId!=="B"||hasBLoweredRightHand(actual))&&(targetId!=="K"||hasKSignature(actual));
 }
 
 /**
