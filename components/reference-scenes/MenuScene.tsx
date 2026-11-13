@@ -28,8 +28,15 @@ function MenuArt({ className, art }: { className: string; art: IllustratorV4Menu
   return <img className={className} src={art.src} style={menuArtStyle(art)} alt="" />;
 }
 
+/** The empty-name prompt is redundant next to the disabled source CTA. */
+export function menuSceneErrorMessage(nameError: string | undefined) {
+  const message = nameError?.replace("ランキング名", "ニックネーム");
+  return message === "ニックネームを入力してください" ? undefined : message;
+}
+
 export function MenuScene({ portrait, nameError, canStart = true }: MenuSceneProps) {
   const art = ILLUSTRATOR_V4_MENU_ART;
+  const visibleError = menuSceneErrorMessage(nameError);
   return <section className="source-scene source-scene--menu" data-portrait={portrait || undefined} data-can-start={canStart || undefined} aria-hidden="true">
     {/* The runtime-safe composite has every desktop source primitive, including a clean input bed. */}
     <MenuArt className="source-menu__stage" art={art.menuV4Stage} />
@@ -45,6 +52,6 @@ export function MenuScene({ portrait, nameError, canStart = true }: MenuScenePro
     <MenuArt className="source-menu__portrait-art source-menu__portrait-art--plate" art={art.menuV4PlateStack} />
 
     {!canStart ? <span className="source-menu__start-disabled" aria-hidden="true" /> : null}
-    {nameError ? <p className="source-menu__error">{nameError.replace("ランキング名", "ニックネーム")}</p> : null}
+    {visibleError ? <p className="source-menu__error">{visibleError}</p> : null}
   </section>;
 }

@@ -33,4 +33,11 @@ describe("reference scene assets", () => {
       expect(existsSync(publicFile(art.src)), `${name}: ${art.src}`).toBe(true);
     }
   });
+
+  it("retains an alpha channel on the source start art used for the disabled silhouette", () => {
+    const png = readFileSync(publicFile(ILLUSTRATOR_V4_MENU_ART.menuV4Start.src));
+    expect(png.subarray(12, 16).toString("ascii")).toBe("IHDR");
+    // PNG color type 6 is RGBA, preserving the source button's transparent corners.
+    expect(png[25]).toBe(6);
+  });
 });

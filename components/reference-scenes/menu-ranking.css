@@ -3,7 +3,7 @@
 .source-scene--menu{background:#512006}
 .source-menu__stage,.source-menu__input-clean,.source-menu__portrait-art{position:absolute;left:var(--menu-art-x);top:var(--menu-art-y);width:var(--menu-art-width);height:var(--menu-art-height);object-fit:fill;image-rendering:pixelated}
 .source-menu__stage{z-index:0}.source-menu__input-clean,.source-menu__portrait-art{display:none}
-.source-menu__start-disabled{position:absolute;z-index:2;left:240.625px;top:388.75px;width:718.75px;height:150.625px;background:#1b0c07;opacity:.42}
+.source-menu__start-disabled{position:absolute;z-index:2;left:240.625px;top:388.75px;width:718.75px;height:150.625px;background:#1b0c07;opacity:.42;-webkit-mask-image:url("/assets/illustrator-v4-menu/menu-v4-start-source.png");mask-image:url("/assets/illustrator-v4-menu/menu-v4-start-source.png");-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;-webkit-mask-size:100% 100%;mask-size:100% 100%}
 .source-menu__error{position:absolute;z-index:2;left:325px;top:369px;width:550px;margin:0;color:#ffcab8;font-size:12px;font-weight:800;line-height:1.1;text-align:center;text-shadow:1px 1px #59200e}
 
 /* Recompose v4 primitives for the tall stage; never crop the desktop source stage. */

@@ -8,7 +8,7 @@
 /* The renderer and its native hit targets share this data-driven orientation. */
 .arcade-shell[data-layout="portrait"]{align-items:start;padding:8px}
 .arcade-canvas[data-layout="portrait"]{width:min(600px,100%);aspect-ratio:3/5;box-shadow:0 0 0 3px #b7440d,0 0 0 7px #080706}
-.arcade-canvas[data-layout="portrait"] .arcade-name{padding:0 8px}
+.arcade-canvas[data-layout="portrait"] .arcade-name{padding:0 8px}.arcade-canvas[data-layout="portrait"] .arcade-menu-name{padding:0 8px 0 16px}
 .arcade-hit:focus-visible::after{content:"";position:absolute;inset:3px;border:2px dashed #fff;box-shadow:0 0 0 2px #130d0a;pointer-events:none}
 .arcade-hit[aria-current="page"]:disabled::after{display:none}
 .arcade-hit:focus-visible{outline:0}
@@ -21,10 +21,10 @@
 
 /* The menu frame is painted from the supplied Illustrator artwork; this is only the live
    text layer inside its white field, leaving the pencil and pixel border visible. */
-.arcade-menu-name{border:0;border-radius:0;background:#fff;color:#777;box-shadow:none;padding:0 8px;font-family:"SushiDigits","SushiLine","Yu Gothic",sans-serif;font-weight:400;letter-spacing:.025em}
+.arcade-menu-name{border:0;border-radius:0;background:#fff;color:#2c160b;box-shadow:none;padding:0 8px 0 16px;font-family:"SushiDigits","SushiLine","Yu Gothic",sans-serif;font-weight:400;letter-spacing:.025em}
 .arcade-menu-name::placeholder{color:#8f8f8f;opacity:1}
 .arcade-menu-name:focus{outline:0}
-.arcade-menu-name:focus-visible{outline:2px dashed #fff;outline-offset:3px;box-shadow:0 0 0 2px #130d0a}
+.arcade-menu-name:focus-visible{outline:0;box-shadow:none}
 .arcade-controls .arcade-hit:disabled{cursor:not-allowed}
 .arcade-person-choice{position:absolute;z-index:3;border:3px solid #100d0a;background:#d7f1ff;color:#172a3a;font:400 12px "SushiDigits","SushiLine","Yu Gothic",sans-serif;box-shadow:3px 3px 0 #160b07;white-space:nowrap}.arcade-person-choice[aria-pressed="true"]{background:#e93524;color:#fff8e6}.arcade-person-choice:focus-visible{outline:2px dashed #fff8e6;outline-offset:3px}
 .booth-settings{position:fixed;right:12px;bottom:12px;z-index:20;font:14px system-ui,-apple-system,sans-serif}.booth-settings>button,.booth-settings section button{min-height:38px;padding:7px 10px;border:1px solid #9aa4b2;border-radius:6px;background:#fff;color:#263242;font:inherit}.booth-settings section{width:min(310px,calc(100vw - 24px));display:grid;gap:8px;margin-top:8px;padding:12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;box-shadow:0 8px 24px #0003;color:#263242}.booth-settings section p{margin:0;line-height:1.45}.booth-settings .booth-end{border-color:#b42318;background:#b42318;color:#fff}
