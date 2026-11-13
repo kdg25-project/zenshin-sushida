@@ -9,6 +9,8 @@ import { resolveCameraCta } from "../lib/camera-cta";
 import { targetHeadRadius, TARGET_LINKS } from "../lib/pose-guide";
 import type { Landmark, PoseTemplate } from "../lib/pose";
 import type { DetectedPose } from "../lib/pose-selection";
+import type { PlayerCandidate } from "../lib/player-candidates";
+import type { MarkerObservation } from "../lib/aruco-types";
 import { sushiWord, type SushiWord, type SushiWordProgress } from "../lib/sushi-words";
 import { SushiSceneFrameGate } from "../lib/sushi-scene-lifecycle";
 import { drawSushiPlate, drawWordmark, loadSushiArt, type SushiArtAssets } from "../lib/sushi-art-2d";
@@ -26,6 +28,7 @@ import type { PlaySceneVisual } from "./reference-scenes/types";
 type RankEntry = { playerName: string; score: number; solved: number; maxCombo: number; averageAccuracy: number; createdAt: number };
 type View = "menu" | "game" | "ranking";
 type Phase = "menu" | "calibration" | "play" | "result" | "ranking";
+export type DetectionDebug={candidates:PlayerCandidate[];markers:MarkerObservation[];lines:string[];selectedCandidateId?:string;capturedAt?:number};
 type Props = {
   view: View; session: GameSession; target: PoseTemplate; wordProgress: SushiWordProgress; upcomingWords: SushiWord[]; completedPlates: number;
   remaining: number; hold: number; displayName: string; playerName: string; nameError?: string; rankName: string;
@@ -34,6 +37,7 @@ type Props = {
   simulation: boolean; rankingEligible: boolean; cameraCalibrated: boolean; cameraStarting: boolean; cameraFailed: boolean; cameraMessage: string; landmarks?: Landmark[]; detectedPoses: DetectedPose[]; rankStarting: boolean;
   /** Monotonic capture time paired atomically with the displayed raw landmarks. */
   poseCapturedAt?: number;
+  detectionDebug?: DetectionDebug;
   ranking: RankEntry[]; rankingStatus: "loading" | "ready" | "error"; rankingPage: number; rankMessage: string; rankError?: string; submitting: boolean;
   videoRef: RefObject<HTMLVideoElement | null>; poseCanvasRef: RefObject<HTMLCanvasElement | null>;
   onNameChange(name: string): void; onOpenCamera(): void; onPractice(): void; onRankings(): void; onOpenPoseList(): void; onOpenStaffSettings(): void; onBackMenu(): void;
@@ -152,6 +156,8 @@ function drawVideoAndBones(ctx: CanvasRenderingContext2D, props: Props, rect: Re
     }
     ctx.restore();
   }
+  const debug=props.detectionDebug;
+  if(debug){ctx.save();ctx.beginPath();ctx.rect(videoRect.x,videoRect.y,videoRect.width,videoRect.height);ctx.clip();ctx.font="11px ui-monospace,monospace";for(const candidate of debug.candidates){const color=candidate.id===debug.selectedCandidateId?"#39e58c":"#f7e95a";ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=3;for(const [fromIndex,toIndex] of BONES){const from=candidate.landmarks[fromIndex],to=candidate.landmarks[toIndex];if(!from||!to)continue;const start=displayBonePoint(from,videoRect),end=displayBonePoint(to,videoRect);ctx.beginPath();ctx.moveTo(start.x,start.y);ctx.lineTo(end.x,end.y);ctx.stroke();}for(const point of candidate.landmarks){if(!point)continue;const shown=displayBonePoint(point,videoRect);ctx.fillStyle=(point.visibility??1)>=.35?color:"#ff5964";ctx.fillRect(shown.x-2,shown.y-2,4,4);}const head=displayBonePoint(candidate.landmarks[0]??candidate.landmarks[11],videoRect);ctx.fillStyle=color;ctx.fillText(candidate.id,head.x+5,head.y-5);}for(const marker of debug.markers){ctx.strokeStyle="#60a5fa";ctx.fillStyle="#60a5fa";ctx.lineWidth=3;ctx.beginPath();marker.corners.forEach((point,index)=>{const x=videoRect.x+(1-point.x)*videoRect.width,y=videoRect.y+point.y*videoRect.height;index?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.closePath();ctx.stroke();const point=marker.corners[0];ctx.fillText(`ID ${marker.id}`,videoRect.x+(1-point.x)*videoRect.width+4,videoRect.y+point.y*videoRect.height-4);}ctx.restore();}
   if (!hasSourceFrame) {
     ctx.strokeStyle = "#fffdf4"; ctx.lineWidth = 4;
     for (const [x,y,dx,dy] of [[inner.x+12,inner.y+12,22,0],[inner.x+12,inner.y+12,0,22],[inner.x+inner.width-12,inner.y+12,-22,0],[inner.x+inner.width-12,inner.y+12,0,22],[inner.x+12,inner.y+inner.height-12,22,0],[inner.x+12,inner.y+inner.height-12,0,-22],[inner.x+inner.width-12,inner.y+inner.height-12,-22,0],[inner.x+inner.width-12,inner.y+inner.height-12,0,-22]] as const) { ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+dx,y+dy);ctx.stroke(); }

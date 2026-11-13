@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { markerSvg, rasterizeMarkerSvg, rasterizeSvg } from "./aruco-marker-art";
 import { arucoModule } from "./aruco-dictionary";
-import { normalizeAllowedMarkers } from "./aruco-result";
+import { normalizeAllowedMarkers, normalizeDebugMarkers } from "./aruco-result";
 import { ARUCO_DICTIONARY, ARUCO_MAX_HAMMING_DISTANCE } from "./aruco-types";
 
 describe("printed ArUco artwork",()=>{
@@ -28,5 +28,11 @@ describe("printed ArUco artwork",()=>{
     const workerInput=printedDetector.detect(image as unknown as ImageData);
     expect(workerInput.map(marker=>marker.id)).toContain(2);
     expect(normalizeAllowedMarkers(workerInput,image.width,image.height)).toEqual([]);
+    expect(normalizeDebugMarkers(workerInput,image.width,image.height).map(marker=>marker.id)).toEqual([2]);
+  });
+
+  it("excludes invalid diagnostics coordinates before they reach the local overlay",()=>{
+    const invalid=[{id:2,corners:[{x:0,y:0},{x:100,y:0},{x:Infinity,y:100},{x:0,y:100}]},{id:2,corners:[{x:0,y:0},{x:100,y:0},{x:100,y:100},{x:-1,y:100}]}];
+    expect(normalizeDebugMarkers(invalid,100,100)).toEqual([]);
   });
 });
