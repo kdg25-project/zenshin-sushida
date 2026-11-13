@@ -1,0 +1,3 @@
+import { describe,expect,it } from "vitest";
+import { decodePreview,encodePreview,previewLimits } from "./booth-preview";
+describe("booth preview codec",()=>{it("round trips bounded aligned metadata and bytes",()=>{const source={frameId:7,capturedAt:9,width:320,height:180,image:new Uint8Array([1,2]),candidates:[{id:"p1",head:{x:.5,y:.2},bones:[] as Array<[number,number,number,number]>}]};expect(decodePreview(encodePreview(source))).toEqual(source);});it("rejects malformed headers and oversized frames",()=>{expect(decodePreview(new Uint8Array(21).buffer)).toBeUndefined();expect(()=>encodePreview({frameId:1,capturedAt:1,width:1,height:1,image:new Uint8Array(previewLimits.maxImageBytes+1),candidates:[]})).toThrow();});});

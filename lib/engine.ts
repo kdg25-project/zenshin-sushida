@@ -1,6 +1,7 @@
 import { type JointName, type Landmark, type NormalizedPose, type Point, INDEX, REQUIRED_JOINTS, POSE_TEMPLATES, type PoseTemplate } from "./pose";
 import { GAME_DURATION_MS, POSE_HOLD_MS, POSE_TEMPLATE_VERSION, POSE_THRESHOLD, poseMatchMargin } from "./game-rules";
 import { type RomajiLetter, type SushiWord, type SushiWordId, type SushiWordProgress, seededRandom, shuffledWordIds, sushiWord, wordSequence } from "./sushi-words";
+import { assessPoseQuality } from "./pose-quality";
 
 export type MatcherResult = { valid: boolean; accuracy: number; jointScore: number; angleScore: number; pathScore: number; reason?: string; pose?: NormalizedPose };
 /** A valid camera pose may still be too similar to another ROMAJI silhouette to solve. */
@@ -25,10 +26,12 @@ const angle = (a: Point, b: Point, c: Point) => { const u = sub(a,b), v = sub(c,
  */
 export function normalizeLandmarks(landmarks: Landmark[], aspect: number): { pose?: NormalizedPose; reason?: string } {
   if (!Number.isFinite(aspect) || aspect <= 0) return { reason: "画像サイズが不正です" };
+  const quality=assessPoseQuality(landmarks);
+  if(!quality.ready)return { reason:quality.hint };
   const raw = {} as NormalizedPose;
   for (const name of REQUIRED_JOINTS) {
     const item = landmarks[INDEX[name]];
-    if (!item || !Number.isFinite(item.x) || !Number.isFinite(item.y) || item.x < 0 || item.x > 1 || item.y < 0 || item.y > 1 || (item.visibility ?? 1) < .55) return { reason: "全身の関節が見えていません" };
+    if (!item || !Number.isFinite(item.x) || !Number.isFinite(item.y)) return { reason: "全身の関節が見えていません" };
     raw[name] = { x: item.x * aspect, y: item.y };
   }
   const hip = { x: (raw.leftHip.x + raw.rightHip.x) / 2, y: (raw.leftHip.y + raw.rightHip.y) / 2 };

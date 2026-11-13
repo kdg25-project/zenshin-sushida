@@ -2,9 +2,10 @@ import { build } from "esbuild";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Miniflare } from "miniflare";
+import { encodePreview } from "../lib/booth-preview";
 
-type Socket = { accept: () => void; close: (code?: number, reason?: string) => void; send: (message: string) => void; addEventListener: (type: "message" | "close", listener: (event: { data?: string; code?: number }) => void) => void };
-type Snapshot = { revision: number; round: number; phase: "menu" | "ready" | "playing" | "result"; name: string; cameraMessage: string; remaining: number; score: number; currentSushi: string; currentLetter: string; wordIndex: number; rankingEligible: boolean; submitted: boolean; registrationMessage: string; hostSeenAt: number; controllerCount: number; playerZone:{minX:number;maxX:number;minY:number;maxY:number;minScale:number}; playerTracking:string };
+type Socket = { accept: () => void; close: (code?: number, reason?: string) => void; send: (message: string|ArrayBuffer) => void; addEventListener: (type: "message" | "close", listener: (event: { data?: string|ArrayBuffer; code?: number }) => void) => void };
+type Snapshot = { revision: number; round: number; wordIndex: number; phase: "menu" | "camera" | "ready" | "countdown" | "playing" | "result"; name: string; cameraMessage: string; remaining: number; score: number; currentSushi: string; currentLetter: string; rankingEligible: boolean; submitted: boolean; registrationMessage: string; hostSeenAt: number; controllerCount: number; playerTracking:string; selectionRequired:boolean };
 
 const password = "festival-test-password";
 const hostToken = "h".repeat(48);
@@ -22,10 +23,10 @@ async function post(mf: Miniflare, path: string, body: unknown, extra: Record<st
 async function createRoom(mf: Miniflare) { const response = await post(mf, "/api/booth/create", { hostToken }, { "x-booth-password": password }); if(response.status !== 200) throw new Error(`create failed ${response.status}: ${await response.text()}`); return await response.json() as { roomId: string; snapshot: Snapshot }; }
 async function joinRoom(mf: Miniflare, token: string) { const response = await post(mf, "/api/booth/join", { controllerToken: token }, { "x-booth-password": password }); expect(response.status).toBe(200); return await response.json() as { roomId: string; snapshot: Snapshot }; }
 async function connect(mf: Miniflare, roomId: string) { const response = await mf.dispatchFetch(`http://local.test/api/booth/ws?room=${encodeURIComponent(roomId)}`, { headers: { upgrade: "websocket" } }); expect(response.status).toBe(101); const socket = (response as unknown as { webSocket: Socket | null }).webSocket; expect(socket).not.toBeNull(); socket!.accept(); return socket!; }
-function messages(socket: Socket) { const values: unknown[] = [], waiters: Array<(value: unknown) => void> = []; socket.addEventListener("message", event => { const value = JSON.parse(event.data!); const waiter = waiters.shift(); if(waiter) waiter(value); else values.push(value); }); const next = () => values.length ? Promise.resolve(values.shift()) : new Promise<unknown>(resolve => waiters.push(resolve)); const nextType = async (type: string) => { for(;;) { const value = await next() as { type?: string }; if(value.type === type) return value as Record<string, unknown>; } }; return { nextType }; }
+function messages(socket: Socket) { const values: unknown[] = [], waiters: Array<(value: unknown) => void> = []; socket.addEventListener("message", event => { if(typeof event.data!=="string")return;const value = JSON.parse(event.data); const waiter = waiters.shift(); if(waiter) waiter(value); else values.push(value); }); const next = () => values.length ? Promise.resolve(values.shift()) : new Promise<unknown>(resolve => waiters.push(resolve)); const nextType = async (type: string) => { for(;;) { const value = await next() as { type?: string }; if(value.type === type) return value as Record<string, unknown>; } }; return { nextType }; }
 async function authenticate(socket: Socket, inbox: ReturnType<typeof messages>, token: string) { socket.send(JSON.stringify({ type: "authenticate", token })); return await inbox.nextType("state") as { snapshot: Snapshot }; }
 async function nextState(inbox: ReturnType<typeof messages>, matches: (value: Snapshot) => boolean) { for(;;) { const value = await inbox.nextType("state") as { snapshot: Snapshot }; if(matches(value.snapshot)) return value.snapshot; } }
-function snapshot(partial: Partial<Snapshot> = {}): Snapshot { return { revision: 0, round: 1, phase: "menu", name: "", cameraMessage: "ready", remaining: 60, score: 0, currentSushi: "", currentLetter: "", wordIndex: 0, rankingEligible: false, submitted: false, registrationMessage: "", hostSeenAt: Date.now(), controllerCount: 0, playerZone: { minX:.2,maxX:.8,minY:.18,maxY:.88,minScale:.075 }, playerTracking: "追跡中", ...partial }; }
+function snapshot(partial: Partial<Snapshot> = {}): Snapshot { return { revision: 0, round: 1, wordIndex: 0, phase: "menu", name: "", cameraMessage: "ready", remaining: 60, score: 0, currentSushi: "", currentLetter: "", rankingEligible: false, submitted: false, registrationMessage: "", hostSeenAt: Date.now(), controllerCount: 0, playerTracking: "追跡中", selectionRequired:false, ...partial }; }
 
 describe("booth WebSocket coordination", () => {
   it("accepts one-character and long nonblank passwords for create and join, but rejects blanks", async () => {
@@ -168,21 +169,22 @@ describe("booth WebSocket coordination", () => {
     } finally { await mf.dispose(); }
   });
 
-  it("validates player-zone commands, forwards only valid inactive settings, and waits for host acknowledgement", async () => {
+  it("accepts only a recent preview candidate before play and waits for the host acknowledgement", async () => {
     const mf=await worker();try{
       const {roomId}=await createRoom(mf);await joinRoom(mf,controllerOne);
       const host=await connect(mf,roomId),hostInbox=messages(host),controller=await connect(mf,roomId),controllerInbox=messages(controller);
       await authenticate(host,hostInbox,hostToken);await authenticate(controller,controllerInbox,controllerOne);
-      host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({phase:"menu",playerTracking:"設定済み"})}));const current=await nextState(controllerInbox,value=>value.playerTracking==="設定済み");
-      controller.send(JSON.stringify({type:"command",id:"invalid-zone-command-001",kind:"set-player-zone",round:current.round,revision:current.revision,playerZone:{minX:.8,maxX:.2,minY:.2,maxY:.8,minScale:.1}}));
-      expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"invalid-zone-command-001",status:"rejected",code:"INVALID_PLAYER_ZONE"});
-      const zone={minX:.25,maxX:.75,minY:.18,maxY:.88,minScale:.12};
-      controller.send(JSON.stringify({type:"command",id:"valid-zone-command-0001",kind:"set-player-zone",round:current.round,revision:current.revision,playerZone:zone}));
-      expect(await hostInbox.nextType("command")).toMatchObject({id:"valid-zone-command-0001",kind:"set-player-zone",playerZone:zone});
-      host.send(JSON.stringify({type:"ack",id:"valid-zone-command-0001",status:"done"}));expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"valid-zone-command-0001",status:"done"});
-      host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({phase:"playing",playerZone:zone})}));const playing=await nextState(controllerInbox,value=>value.phase==="playing");
-      controller.send(JSON.stringify({type:"command",id:"locked-zone-command-0001",kind:"set-player-zone",round:playing.round,revision:playing.revision,playerZone:zone}));
-      expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"locked-zone-command-0001",status:"rejected",code:"STALE_STATE"});
+      host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({phase:"camera",playerTracking:"選択待ち",selectionRequired:true})}));const current=await nextState(controllerInbox,value=>value.playerTracking==="選択待ち");
+      controller.send(JSON.stringify({type:"preview-subscribe",enabled:true}));
+      host.send(encodePreview({frameId:7,capturedAt:1,width:1,height:1,image:new Uint8Array([1]),candidates:[{id:"p1",head:{x:.5,y:.2},bones:[]}]}));
+      controller.send(JSON.stringify({type:"command",id:"invalid-player-command-001",kind:"select-player",round:current.round,revision:0,candidateId:"not-a-candidate",frameId:-1}));
+      expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"invalid-player-command-001",status:"rejected",code:"INVALID_PLAYER"});
+      controller.send(JSON.stringify({type:"command",id:"valid-player-command-0001",kind:"select-player",round:current.round,revision:0,candidateId:"p1",frameId:7}));
+      expect(await hostInbox.nextType("command")).toMatchObject({id:"valid-player-command-0001",kind:"select-player",candidateId:"p1",frameId:7});
+      host.send(JSON.stringify({type:"ack",id:"valid-player-command-0001",status:"done"}));expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"valid-player-command-0001",status:"done"});
+      host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({phase:"playing"})}));const playing=await nextState(controllerInbox,value=>value.phase==="playing");
+      controller.send(JSON.stringify({type:"command",id:"locked-player-command-0001",kind:"select-player",round:playing.round,revision:0,candidateId:"p1",frameId:7}));
+      expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"locked-player-command-0001",status:"rejected",code:"STALE_STATE"});
     }finally{await mf.dispose();}
   });
 

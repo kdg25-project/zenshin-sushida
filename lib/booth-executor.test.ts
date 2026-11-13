@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { rememberBoothExecution, validateBoothExecution, type BoothExecutionResult } from "./booth-executor";
 
 const command=(overrides:Partial<{id:string;kind:"skip";round:number;word:number;createdAt:number;expiresAt:number}>={})=>({id:"skip-command-0001",kind:"skip" as const,round:4,word:8,createdAt:100,expiresAt:200,...overrides});
-const state=(overrides:Partial<{round:number;wordIndex:number;phase:"playing"|"result";now:number}>={})=>({round:4,wordIndex:8,phase:"playing" as const,now:150,...overrides});
+const state=(overrides:Partial<{round:number;wordIndex:number;phase:"camera"|"ready"|"countdown"|"playing"|"result";now:number}>={})=>({round:4,wordIndex:8,phase:"playing" as const,now:150,...overrides});
 
 describe("PC booth command guard",()=>{
   it("allows a skip after letters advance within the same sushi but rejects an old dish",()=>{
@@ -14,10 +14,11 @@ describe("PC booth command guard",()=>{
     expect(validateBoothExecution(command({round:3}),state(),new Map())).toMatchObject({code:"ROUND_CHANGED"});
     expect(validateBoothExecution(command(),state({phase:"result"}),new Map())).toMatchObject({code:"NOT_PLAYING"});
   });
-  it("rejects malformed or active player-zone changes even if an old server snapshot forwarded them",()=>{
-    const zone={minX:.2,maxX:.8,minY:.2,maxY:.8,minScale:.1};
-    expect(validateBoothExecution({...command({kind:"set-player-zone" as any}),playerZone:{...zone,minX:.9,maxX:.1}},state(),new Map())).toMatchObject({code:"INVALID_PLAYER_ZONE"});
-    expect(validateBoothExecution({...command({kind:"set-player-zone" as any}),playerZone:zone},state({phase:"playing"}),new Map())).toMatchObject({code:"PLAYER_ZONE_LOCKED"});
+  it("permits selecting a player only before the game starts",()=>{
+    const selection={id:"select-player-0001",kind:"select-player" as const,round:4,candidateId:"p1",frameId:5,createdAt:100,expiresAt:200};
+    expect(validateBoothExecution(selection,state({phase:"camera"}),new Map())).toBeUndefined();
+    expect(validateBoothExecution(selection,state({phase:"playing"}),new Map())).toMatchObject({code:"PLAYER_SELECTION_LOCKED"});
+    expect(validateBoothExecution(selection,state({phase:"countdown"}),new Map())).toMatchObject({code:"PLAYER_SELECTION_LOCKED"});
   });
   it("returns a cached result exactly once across reconnect delivery",()=>{
     const completed=new Map<string,{at:number;result:BoothExecutionResult}>(),done={ok:true,code:"SKIPPED",message:"寿司をスキップしました"};

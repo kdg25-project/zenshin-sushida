@@ -9,7 +9,6 @@ import { resolveCameraCta } from "../lib/camera-cta";
 import { targetHeadRadius, TARGET_LINKS } from "../lib/pose-guide";
 import type { Landmark, PoseTemplate } from "../lib/pose";
 import type { DetectedPose } from "../lib/pose-selection";
-import type { PlayerZone } from "../lib/player-zone";
 import { sushiWord, type SushiWord, type SushiWordProgress } from "../lib/sushi-words";
 import { SushiSceneFrameGate } from "../lib/sushi-scene-lifecycle";
 import { drawSushiPlate, drawWordmark, loadSushiArt, type SushiArtAssets } from "../lib/sushi-art-2d";
@@ -31,7 +30,7 @@ type Props = {
   remaining: number; hold: number; displayName: string; playerName: string; nameError?: string; rankName: string;
   /** UI clock supplied by GameClient; it never changes engine scoring or control timing. */
   presentationNow?: number;
-  simulation: boolean; rankingEligible: boolean; cameraCalibrated: boolean; cameraStarting: boolean; cameraFailed: boolean; cameraMessage: string; landmarks?: Landmark[]; detectedPoses: DetectedPose[]; playerZone:PlayerZone; rankStarting: boolean;
+  simulation: boolean; rankingEligible: boolean; cameraCalibrated: boolean; cameraStarting: boolean; cameraFailed: boolean; cameraMessage: string; landmarks?: Landmark[]; detectedPoses: DetectedPose[]; rankStarting: boolean;
   ranking: RankEntry[]; rankingStatus: "loading" | "ready" | "error"; rankingPage: number; rankMessage: string; rankError?: string; submitting: boolean;
   videoRef: RefObject<HTMLVideoElement | null>; poseCanvasRef: RefObject<HTMLCanvasElement | null>;
   onNameChange(name: string): void; onOpenCamera(): void; onPractice(): void; onRankings(): void; onOpenPoseList(): void; onOpenStaffSettings(): void; onBackMenu(): void;
@@ -129,11 +128,6 @@ function drawVideoAndBones(ctx: CanvasRenderingContext2D, props: Props, rect: Re
   } else if (props.simulation && props.landmarks?.length) {
     text(ctx, "自動デモ", videoRect.x + videoRect.width - 8, videoRect.y + 12, 11, "#fff7dc", "right", pixelFont);
   } else text(ctx, props.simulation ? "自動デモ" : props.cameraFailed ? "カメラをつなぎ直してください" : "カメラを準備しています…", rect.x + rect.width / 2, rect.y + rect.height / 2 + 10, 17, "#fff7dc", "center", pixelFont);
-  const zone=props.playerZone;
-  if (phaseFor(props)==="calibration") {
-    const x=videoRect.x+(1-zone.maxX)*videoRect.width,y=videoRect.y+zone.minY*videoRect.height,w=(zone.maxX-zone.minX)*videoRect.width,h=(zone.maxY-zone.minY)*videoRect.height;
-    ctx.save();ctx.strokeStyle="#7df0b4";ctx.lineWidth=3;ctx.setLineDash([8,5]);ctx.strokeRect(x,y,w,h);ctx.setLineDash([]);text(ctx,"床マーカー: 胴体をこの枠内へ",x+w/2,Math.max(videoRect.y+14,y-7),11,"#eafff2","center",pixelFont);ctx.restore();
-  }
   if (props.detectedPoses.length) {
     ctx.save(); ctx.lineWidth = 5; ctx.lineCap = "round";
     for (const person of props.detectedPoses) {
@@ -467,7 +461,7 @@ export function GameCanvas(props: Props) {
   const overlay = (id: string, rect: Rect, value: string, onClick: () => void, disabled = false, current = false, title?: string) => <button key={id} className="arcade-hit" style={cssRect(rect, viewport)} aria-label={value} aria-current={current ? "page" : undefined} disabled={disabled} title={title} onClick={onClick} onPointerEnter={() => setHover(id)} onPointerLeave={() => setHover("")} onFocus={() => setHover(id)} onBlur={() => setHover("")}><span className="sr-only">{value}</span></button>;
   const controls = useMemo(() => {
     if (currentPhase === "menu") return <>{overlay("camera", activeRects.menuCamera, "あそぶ", props.onOpenCamera, !canStartMenu)}{overlay("demo", activeRects.menuPractice, "お茶をいれて自動デモを見る。自動入力、ランキング対象外", props.onPractice, false, false, "お茶をいれて自動デモを見る")}{overlay("ranking", activeRects.menuRanking, "ランキング", props.onRankings)}{overlay("poseList", activeRects.menuPoseList, "ポーズ一覧を開く", props.onOpenPoseList)}{overlay("staffSettings", staffPlateRect, "スタッフ設定を開く", props.onOpenStaffSettings)}</>;
-    if (currentPhase === "calibration") { const cta = resolveCameraCta({ simulation:props.simulation, calibrated:props.cameraCalibrated, starting:props.cameraStarting, failed:props.cameraFailed, hasName:!!props.playerName }); return <>{overlay("start", activeRects.calibrationStart, props.simulation ? "自動デモを開始" : cta.label, cta.action === "retry-camera" ? props.onStartCamera : props.onStart, cta.disabled)}{overlay("back", activeRects.calibrationBack, "メニューへ", props.onBackMenu)}</>; }
+    if (currentPhase === "calibration") { const cta = resolveCameraCta({ simulation:props.simulation, calibrated:props.cameraCalibrated, starting:props.cameraStarting, failed:props.cameraFailed, hasName:!!props.playerName, reason:props.cameraMessage }); return <>{overlay("start", activeRects.calibrationStart, props.simulation ? "自動デモを開始" : cta.label, cta.action === "retry-camera" ? props.onStartCamera : props.onStart, cta.disabled)}{overlay("back", activeRects.calibrationBack, "メニューへ", props.onBackMenu)}</>; }
     if (currentPhase === "play") return props.session.status === "playing" ? overlay("skip", activeRects.gameSkip, "このおすしを流す。コンボは0になります", props.onSkip) : null;
     if (currentPhase === "result") return <>{props.rankingEligible && overlay("register", activeRects.resultRegister, "ランキングに登録する", props.onRegister, props.submitting)}{overlay("retry", activeRects.resultRetry, "もう一度にぎる", props.onRetry)}{overlay("menu", activeRects.resultMenu, "メニューへ", props.onBackMenu)}</>;
     const pages = Math.max(1, Math.min(4, Math.ceil(props.ranking.length / 10))), pageRects = [activeRects.rankingPage1, activeRects.rankingPage2, activeRects.rankingPage3, activeRects.rankingPage4];
