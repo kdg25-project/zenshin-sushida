@@ -5,7 +5,7 @@ import { Miniflare } from "miniflare";
 
 type Socket = { accept:()=>void; close:(code?:number,reason?:string)=>void; send:(message:string)=>void; addEventListener:(type:"message"|"close",listener:(event:{data?:string;code?:number})=>void)=>void };
 type Snapshot = { revision:number; round:number; wordIndex:number; phase:string; name:string; online?:boolean };
-const password="lifecycle-password", host="h".repeat(48), oldHost="z".repeat(48), controller="c".repeat(48);
+const password="lifecycle-password", otherPassword="other-lifecycle-password", host="h".repeat(48), otherHost="o".repeat(48), oldHost="z".repeat(48), controller="c".repeat(48), otherController="d".repeat(48);
 
 async function worker(){
   const root=process.cwd();
@@ -16,6 +16,8 @@ async function worker(){
 const post=(mf:Miniflare,path:string,body:unknown,extra:Record<string,string>={})=>mf.dispatchFetch(`http://local.test${path}`,{method:"POST",headers:{"content-type":"application/json",...extra},body:JSON.stringify(body)});
 async function create(mf:Miniflare,token=host){const r=await post(mf,"/api/booth/create",{hostToken:token},{"x-booth-password":password});expect(r.status).toBe(200);return await r.json() as {roomId:string;snapshot:Snapshot};}
 async function join(mf:Miniflare,token=controller){const r=await post(mf,"/api/booth/join",{controllerToken:token},{"x-booth-password":password});expect(r.status).toBe(200);return await r.json() as {roomId:string;snapshot:Snapshot};}
+async function createWith(mf:Miniflare,sessionPassword:string,token:string){const r=await post(mf,"/api/booth/create",{hostToken:token},{"x-booth-password":sessionPassword});expect(r.status).toBe(200);return await r.json() as {roomId:string;snapshot:Snapshot};}
+async function joinWith(mf:Miniflare,sessionPassword:string,token:string){const r=await post(mf,"/api/booth/join",{controllerToken:token},{"x-booth-password":sessionPassword});expect(r.status).toBe(200);return await r.json() as {roomId:string;snapshot:Snapshot};}
 async function connect(mf:Miniflare,roomId:string){const r=await mf.dispatchFetch(`http://local.test/api/booth/ws?room=${encodeURIComponent(roomId)}`,{headers:{upgrade:"websocket"}});const socket=(r as unknown as {webSocket:Socket|null}).webSocket;return {status:r.status,socket};}
 function inbox(socket:Socket){const queued:unknown[]=[],waiters:Array<(v:unknown)=>void>=[];socket.addEventListener("message",e=>{const v=JSON.parse(e.data!);const take=waiters.shift();if(take)take(v);else queued.push(v);});const next=()=>queued.length?Promise.resolve(queued.shift()):new Promise<unknown>(resolve=>waiters.push(resolve));const type=async(t:string)=>{for(;;){const value=await Promise.race([next(),new Promise<never>((_,reject)=>setTimeout(()=>reject(new Error(`timed out waiting for ${t}`)),1_500))]) as {type?:string};if(value.type===t)return value as Record<string,unknown>;}};return {type};}
 async function auth(socket:Socket,box:ReturnType<typeof inbox>,token:string){socket.send(JSON.stringify({type:"authenticate",token}));return await box.type("state") as {snapshot:Snapshot;online?:boolean};}
@@ -36,6 +38,29 @@ describe("booth session lifecycle",()=>{
 
   it("ends a session from the authenticated host and revokes controller tokens",async()=>{
     const mf=await worker();try{const {roomId}=await create(mf);await join(mf);const h=await connect(mf,roomId),c=await connect(mf,roomId);h.socket!.accept();c.socket!.accept();const hbox=inbox(h.socket!),cbox=inbox(c.socket!);await auth(h.socket!,hbox,host);await auth(c.socket!,cbox,controller);const ended=new Promise<{code?:number}>(resolve=>c.socket!.addEventListener("close",resolve));h.socket!.send(JSON.stringify({type:"end-session",id:"end-session-000001"}));expect(await cbox.type("session-ended")).toBeTruthy();expect((await ended).code).toBe(1008);expect((await connect(mf,roomId)).status).toBe(410);expect((await post(mf,"/api/booth/create",{hostToken:oldHost},{"x-booth-password":password})).status).toBe(200);}finally{await mf.dispose();}});
+
+  it("lets only the current host end every booth session, revokes other rooms, and permits fresh sessions",async()=>{
+    const mf=await worker();try{
+      const first=await create(mf);await join(mf);
+      const second=await createWith(mf,otherPassword,otherHost);await joinWith(mf,otherPassword,otherController);
+      const firstHost=await connect(mf,first.roomId),firstController=await connect(mf,first.roomId),secondHost=await connect(mf,second.roomId),secondControllerSocket=await connect(mf,second.roomId);
+      firstHost.socket!.accept();firstController.socket!.accept();secondHost.socket!.accept();secondControllerSocket.socket!.accept();
+      const firstHostBox=inbox(firstHost.socket!),firstControllerBox=inbox(firstController.socket!),secondHostBox=inbox(secondHost.socket!),secondControllerBox=inbox(secondControllerSocket.socket!);
+      await auth(firstHost.socket!,firstHostBox,host);await auth(firstController.socket!,firstControllerBox,controller);await auth(secondHost.socket!,secondHostBox,otherHost);await auth(secondControllerSocket.socket!,secondControllerBox,otherController);
+      const rejected=new Promise<{code?:number}>(resolve=>firstController.socket!.addEventListener("close",resolve));
+      firstController.socket!.send(JSON.stringify({type:"end-all-sessions",id:"end-all-denied-0001"}));
+      expect((await rejected).code).toBe(1008);
+      firstHost.socket!.send(JSON.stringify({type:"end-all-sessions",id:"end-all-sessions-0001"}));
+      expect(await firstHostBox.type("command-result")).toMatchObject({id:"end-all-sessions-0001",status:"done",code:"ALL_SESSIONS_ENDED"});
+      expect(await firstHostBox.type("session-ended")).toBeTruthy();
+      const secondEnded=new Promise<{code?:number}>(resolve=>secondControllerSocket.socket!.addEventListener("close",resolve));
+      secondControllerSocket.socket!.send(JSON.stringify({type:"ping"}));
+      expect(await secondControllerBox.type("session-ended")).toBeTruthy();
+      expect((await secondEnded).code).toBe(1008);
+      expect((await post(mf,"/api/booth/join",{controllerToken:otherController},{"x-booth-password":otherPassword})).status).toBe(410);
+      expect((await post(mf,"/api/booth/create",{hostToken:oldHost},{"x-booth-password":otherPassword})).status).toBe(200);
+    }finally{await mf.dispose();}
+  });
 
   it("caps unauthenticated sockets and closes one that exceeds the authentication deadline",async()=>{
     const mf=await worker();try{const {roomId}=await create(mf);const sockets:Socket[]=[];for(let i=0;i<16;i++){const item=await connect(mf,roomId);expect(item.status).toBe(101);item.socket!.accept();sockets.push(item.socket!);}const capped=await connect(mf,roomId);expect(capped.status).toBe(429);const closed=new Promise<{code?:number}>(resolve=>sockets[0].addEventListener("close",resolve));await testControl(mf,roomId,"/__test/time",{now:Date.now()+8_001});await testControl(mf,roomId,"/__test/tick");expect((await closed).code).toBe(1008);}finally{await mf.dispose();}},15_000);
