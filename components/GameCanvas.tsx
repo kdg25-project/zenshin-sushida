@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { GameSession } from "../lib/engine";
-import { GAME_HEIGHT, GAME_WIDTH, PORTRAIT_HEIGHT, PORTRAIT_WIDTH, canvasBackingTransform, containVideo, conveyorLaneWords, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, playCountdownOverlay, playFeedbackLayout, playGuideTargetRect, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText, type Rect } from "../lib/game-canvas-layout";
+import { GAME_HEIGHT, GAME_WIDTH, PORTRAIT_HEIGHT, PORTRAIT_WIDTH, cameraVideoViewport, canvasBackingTransform, containVideo, conveyorLaneWords, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, playCameraPanel, playCountdownOverlay, playFeedbackLayout, playGuideTargetRect, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText, type Rect } from "../lib/game-canvas-layout";
 import { formatStoredRankingAccuracy } from "../lib/game-ui";
 import { applyPresentationLifecycle } from "../lib/presentation-lifecycle";
 import { resolveCameraCta } from "../lib/camera-cta";
@@ -16,7 +16,7 @@ import { drawSushiPlate, drawWordmark, loadSushiArt, type SushiArtAssets } from 
 import { drawable, loadSfUiAssets, type SfUiAssets } from "../lib/sf-ui-assets";
 import { drawRankingCrown } from "../lib/ranking-crown";
 import { drawRankingBadge, drawRankingPager, drawSourceRankingCrown, rankingBadgeVisualRect } from "../lib/ranking-pagination";
-import { GameScene } from "./reference-scenes/GameScene";
+import { GameScene, MatchBadge } from "./reference-scenes/GameScene";
 import { MenuScene } from "./reference-scenes/MenuScene";
 import { RankingScene } from "./reference-scenes/RankingScene";
 import { SceneStage } from "./reference-scenes/SceneStage";
@@ -117,11 +117,10 @@ function drawCornerWave(ctx: CanvasRenderingContext2D, x: number, y: number, fli
   ctx.save();ctx.translate(x,y);if(flip)ctx.scale(-1,1);ctx.strokeStyle="#fffaf0";ctx.lineWidth=5;
   for(let row=0;row<3;row++)for(let col=0;col<4;col++){const px=col*30+(row%2)*15,py=row*27;ctx.beginPath();ctx.arc(px,py+20,17,Math.PI,0);ctx.arc(px,py+20,8,Math.PI,0);ctx.stroke();}ctx.restore();
 }
-function drawVideoAndBones(ctx: CanvasRenderingContext2D, props: Props, rect: Rect, referencePanel = false) {
-  if (!referencePanel) pixelFrame(ctx, rect, "#bcbcbc", "#100d0a", 7);
-  // Reserve the top of both panels for the caption, then use one framing treatment only.
-  const inner = { x:rect.x + 12, y:rect.y + 34, width:rect.width - 24, height:rect.height - 46 };
-  if (!referencePanel) { ctx.fillStyle = "#afb0b1"; ctx.fillRect(inner.x, inner.y, inner.width, inner.height); }
+function drawVideoAndBones(ctx: CanvasRenderingContext2D, props: Props, rect: Rect, kind: "calibration" | "play", hasSourceFrame = false, portrait = false) {
+  if (!hasSourceFrame) pixelFrame(ctx, rect, "#bcbcbc", "#100d0a", 7);
+  const inner = cameraVideoViewport(rect, kind, portrait);
+  if (!hasSourceFrame) { ctx.fillStyle = "#afb0b1"; ctx.fillRect(inner.x, inner.y, inner.width, inner.height); }
   const video = props.videoRef.current;
   const videoRect = containVideo(inner, video?.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 16 / 9);
   if (video && video.readyState > 1) {
@@ -156,7 +155,7 @@ function drawVideoAndBones(ctx: CanvasRenderingContext2D, props: Props, rect: Re
     }
     ctx.restore();
   }
-  if (!referencePanel) {
+  if (!hasSourceFrame) {
     ctx.strokeStyle = "#fffdf4"; ctx.lineWidth = 4;
     for (const [x,y,dx,dy] of [[inner.x+12,inner.y+12,22,0],[inner.x+12,inner.y+12,0,22],[inner.x+inner.width-12,inner.y+12,-22,0],[inner.x+inner.width-12,inner.y+12,0,22],[inner.x+12,inner.y+inner.height-12,22,0],[inner.x+12,inner.y+inner.height-12,0,-22],[inner.x+inner.width-12,inner.y+inner.height-12,-22,0],[inner.x+inner.width-12,inner.y+inner.height-12,0,-22]] as const) { ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+dx,y+dy);ctx.stroke(); }
   }
@@ -241,7 +240,7 @@ function drawCalibration(ctx: CanvasRenderingContext2D, props: Props, rects: typ
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH;
   const cta = resolveCameraCta({ simulation:props.simulation, calibrated:props.cameraCalibrated, starting:props.cameraStarting, failed:props.cameraFailed, hasName:!!props.playerName });
   text(ctx, props.simulation ? "自動デモ・ランキング対象外" : props.cameraFailed ? "カメラをつなぎ直してください" : "カメラを準備して、全身を映してください", width / 2, portrait ? 132 : 72, portrait ? 20 : 27, portrait ? "#392915" : "#fff4d1", "center", pixelFont);
-  drawVideoAndBones(ctx, props, rects.camera);
+  drawVideoAndBones(ctx, props, rects.camera, "calibration");
   if (!portrait) {
     const guide = desktopScene.calibrationGuide;
     paper(ctx, guide, "#f7e9c5");
@@ -260,13 +259,13 @@ function drawPlay(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefi
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, accuracy = Math.round((props.session.lastAccuracy ?? 0) * 100);
   drawHud(ctx, reference, props, width, portrait); drawLane(ctx, assets, reference, props, width, portrait, time, animate);
   const guide = portrait ? { x:30, y:450, width:255, height:177 } : desktopScene.playGuide;
-  const camera = portrait ? { x:300, y:450, width:270, height:177 } : desktopScene.playCamera;
+  const camera = portrait ? playCameraPanel.portrait : desktopScene.playCamera;
   if (!portrait && drawable(reference?.poseGuide)) drawImage(ctx,reference?.poseGuide,guide); else paper(ctx,guide,"#fde0b4");
   pixelFrame(ctx,{x:guide.x+28,y:guide.y-16,width:guide.width-56,height:44},"#fde0b4");
   text(ctx,"お手本のポーズ",guide.x+guide.width/2,guide.y+5,portrait?14:20,"#172a3a","center",pixelFont);
   drawTarget(ctx, props.target, playGuideTargetRect(portrait));
   if (!portrait && drawable(reference?.poseCamera)) drawImage(ctx,reference?.poseCamera,camera);
-  drawVideoAndBones(ctx, props, camera, !portrait && drawable(reference?.poseCamera));
+  drawVideoAndBones(ctx, props, camera, "play", !portrait && drawable(reference?.poseCamera), portrait);
   pixelFrame(ctx,{x:camera.x+70,y:camera.y-16,width:camera.width-140,height:44},"#fde0b4");
   text(ctx,"現在のポーズ",camera.x+camera.width/2,camera.y+5,portrait?14:20,"#172a3a","center",pixelFont);
   const feedback = portrait ? { x:30, y:638, width:540, height:82 } : desktopScene.playFeedback;
@@ -284,9 +283,9 @@ function drawPlay(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefi
 }
 /** Canvas is restricted to the live camera and target skeleton once source-art DOM is active. */
 function drawPlayLive(ctx: CanvasRenderingContext2D, props: Props, portrait: boolean) {
-  const camera = portrait ? { x:300, y:450, width:270, height:177 } : desktopScene.playCamera;
+  const camera = portrait ? playCameraPanel.portrait : desktopScene.playCamera;
   drawTarget(ctx, props.target, playGuideTargetRect(portrait));
-  drawVideoAndBones(ctx, props, camera, true);
+  drawVideoAndBones(ctx, props, camera, "play", true, portrait);
 }
 function drawResult(ctx: CanvasRenderingContext2D, assets: SushiArtAssets | undefined, props: Props, rects: typeof gameRects | typeof portraitGameRects, portrait: boolean) {
   const width = portrait ? PORTRAIT_WIDTH : GAME_WIDTH, card = portrait ? { x:30, y:135, width:540, height:755 } : { x:300, y:90, width:600, height:530 };
@@ -480,7 +479,7 @@ export function GameCanvas(props: Props) {
   const visibleRanks = props.ranking.slice(props.rankingPage * 10, props.rankingPage * 10 + 10);
   const scene = currentPhase === "menu" ? <SceneStage viewport={viewport}><MenuScene portrait={layoutMode === "portrait"} nameError={props.nameError} canStart={canStartMenu}/></SceneStage>
     : currentPhase === "ranking" ? <SceneStage viewport={viewport}><RankingScene portrait={layoutMode === "portrait"} rows={visibleRanks.map((row, index) => ({ rank:props.rankingPage * 10 + index + 1, playerName:row.playerName, score:row.score }))} page={props.rankingPage} pageCount={Math.max(1, Math.min(4, Math.ceil(props.ranking.length / 10)))} status={props.rankingStatus} message={props.rankError}/></SceneStage>
-      : playVisual ? <SceneStage viewport={viewport} className="game-scene-stage"><GameScene model={playVisual} portrait={layoutMode === "portrait"} suppressCountdown/></SceneStage> : null;
+      : playVisual ? <><SceneStage viewport={viewport} className="game-scene-stage"><GameScene model={playVisual} portrait={layoutMode === "portrait"} suppressCountdown externalFeedback/></SceneStage>{playVisual.showFeedback !== false && <SceneStage viewport={viewport} className="arcade-play-feedback-overlay"><MatchBadge model={playVisual} portrait={layoutMode === "portrait"}/></SceneStage>}</> : null;
   const countdownOverlay = playVisual?.countdown ? (() => {
     const overlay = playCountdownOverlay(layoutMode === "portrait");
     return <div className="arcade-play-countdown" style={{ ...cssRect(overlay.rect, viewport), zIndex: overlay.zIndex }} aria-hidden="true"><span>ご用意！</span><strong>{playVisual.countdown}</strong></div>;

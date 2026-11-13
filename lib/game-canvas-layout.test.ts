@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GAME_HEIGHT, GAME_WIDTH, type Rect, canvasBackingRect, containVideo, conveyorLaneWords, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameLayoutModeForWidth, gameRects, hudNumericLayout, hudSnapshotKey, playCountdownOverlay, playFeedbackLayout, playGuidePanel, playGuideTargetRect, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, rectsOverlap, referenceTicketCopyLayout, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
+import { GAME_HEIGHT, GAME_WIDTH, type Rect, cameraVideoViewport, canvasBackingRect, containVideo, conveyorLaneWords, cssRect, desktopScene, displayBonePoint, fitGameViewport, fitTargetPose, fittedTextSize, gameCurrentPoseFrameSourceBounds, gameLayoutModeForWidth, gameRects, hudNumericLayout, hudSnapshotKey, playCameraPanel, playCountdownOverlay, playFeedbackLayout, playGuidePanel, playGuideTargetRect, playMatchBadgeRect, portraitGameRects, rankingCanvasGeometry, rankingCrownRect, rectsOverlap, referenceTicketCopyLayout, ticketTextSlot, truncateCanvasText, wordTileLayout, wrapCanvasText } from "./game-canvas-layout";
 import { POSE_TEMPLATES } from "./pose";
 import { SUSHI_WORDS } from "./sushi-words";
 
@@ -119,6 +119,59 @@ describe("game canvas layout", () => {
     expect(600 + 0.4 * 120).toBeGreaterThan(600);
   });
 
+  it("keeps the desktop live camera panel on the native source-art bounds", () => {
+    const [left, top, right, bottom] = gameCurrentPoseFrameSourceBounds;
+    expect(playCameraPanel.desktop).toEqual({
+      x: (left + 960.5) * 1200 / 1920,
+      y: (top + 540.5) * 1200 / 1920,
+      width: (right - left) * 1200 / 1920,
+      height: (bottom - top) * 1200 / 1920,
+    });
+    expect(desktopScene.playCamera).toBe(playCameraPanel.desktop);
+  });
+
+  it("centres complete camera frames in the visible play and waiting apertures", () => {
+    const play = cameraVideoViewport(playCameraPanel.desktop, "play");
+    expect(play).toEqual({ x:559.375, y:503.125, width:464.375, height:132.5 });
+    for (const aspect of [16 / 9, 4 / 3]) {
+      const video = containVideo(play, aspect);
+      expect(video.x).toBeGreaterThanOrEqual(play.x);
+      expect(video.y).toBeGreaterThanOrEqual(play.y);
+      expect(video.x + video.width).toBeLessThanOrEqual(play.x + play.width);
+      expect(video.y + video.height).toBeLessThanOrEqual(play.y + play.height);
+      expect(video.x + video.width / 2).toBeCloseTo(play.x + play.width / 2);
+      expect(video.y + video.height / 2).toBeCloseTo(play.y + play.height / 2);
+      expect(displayBonePoint({ x:.5, y:.5 }, video)).toEqual({ x:expect.closeTo(play.x + play.width / 2), y:expect.closeTo(play.y + play.height / 2) });
+    }
+
+    const waiting = cameraVideoViewport(desktopScene.calibrationCamera, "calibration");
+    expect(waiting).toEqual({ x:97, y:137, width:476, height:246 });
+    const waitingVideo = containVideo(waiting, 16 / 9);
+    expect(waitingVideo.x + waitingVideo.width / 2).toBeCloseTo(waiting.x + waiting.width / 2);
+    expect(waitingVideo.y + waitingVideo.height / 2).toBeCloseTo(waiting.y + waiting.height / 2);
+  });
+
+  it("keeps the compact play camera below its caption while centring the frame", () => {
+    const compact = cameraVideoViewport(playCameraPanel.portrait, "play", true);
+    expect(compact).toEqual({ x:312, y:484, width:246, height:131 });
+    expect(compact.y).toBeGreaterThanOrEqual(472);
+    const video = containVideo(compact, 16 / 9);
+    expect(video.width).toBeCloseTo(131 * 16 / 9);
+    expect(video.y + video.height / 2).toBeCloseTo(compact.y + compact.height / 2);
+  });
+
+  it("keeps the match badge in the same play stage as the camera at both breakpoints", () => {
+    for (const portrait of [false, true]) {
+      const panel = portrait ? playCameraPanel.portrait : playCameraPanel.desktop;
+      const badge = playMatchBadgeRect(portrait);
+      const scale = portrait ? .544 : 1;
+      expect(badge.x).toBeGreaterThanOrEqual(panel.x);
+      expect(badge.x + badge.width * scale).toBeLessThanOrEqual(panel.x + panel.width);
+      expect(badge.y).toBeGreaterThanOrEqual(panel.y);
+      expect(badge.y + badge.height * scale).toBeLessThanOrEqual(panel.y + panel.height);
+    }
+  });
+
   it("invalidates the cached HUD for countdown, status, and hold progress changes", () => {
     const base = { phase:"play",status:"countdown",countdown:3,remaining:60,score:0,combo:0,solved:0,accuracy:0,hold:0,targetId:"maki",message:"",hover:"" };
     expect(hudSnapshotKey(base)).not.toBe(hudSnapshotKey({ ...base, countdown: 2 }));
@@ -201,7 +254,9 @@ describe("game canvas layout", () => {
     expect(desktopScene.waveLeft.y + desktopScene.waveLeft.height).toBeLessThanOrEqual(desktopScene.navyBoard.y + desktopScene.navyBoard.height);
     expect(desktopScene.waveRight.y + desktopScene.waveRight.height).toBeLessThanOrEqual(desktopScene.navyBoard.y + desktopScene.navyBoard.height);
     expect(desktopScene.playGuide.y + desktopScene.playGuide.height).toBeLessThanOrEqual(desktopScene.playFeedback.y);
-    expect(desktopScene.playCamera.y + desktopScene.playCamera.height).toBeLessThanOrEqual(desktopScene.playFeedback.y);
+    const liveVideo = cameraVideoViewport(desktopScene.playCamera, "play");
+    expect(liveVideo.y).toBeGreaterThan(desktopScene.playCamera.y);
+    expect(liveVideo.y + liveVideo.height).toBeLessThanOrEqual(desktopScene.playCamera.y + desktopScene.playCamera.height);
     expect(desktopScene.playFeedback.y + desktopScene.playFeedback.height).toBeLessThanOrEqual(GAME_HEIGHT);
   });
 

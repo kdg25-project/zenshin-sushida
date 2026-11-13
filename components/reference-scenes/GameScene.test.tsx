@@ -2,7 +2,7 @@ import React from "react";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { GameScene } from "./GameScene";
+import { GameScene, MatchBadge } from "./GameScene";
 import type { PlaySceneVisual } from "./types";
 
 const fixture: PlaySceneVisual = {
@@ -77,6 +77,16 @@ describe("GameScene", () => {
     expect(markup(1)).toContain('data-tone="good"');
     expect(markup(Number.NaN)).toContain('data-tone="unavailable"');
     expect(markup(Number.NaN)).toContain("--");
+  });
+
+  it("allows the live canvas owner to lift the badge into a separate shared-stage overlay", () => {
+    const scene = renderToStaticMarkup(<GameScene model={fixture} portrait={false} externalFeedback/>);
+    expect(scene).not.toContain("game-match-badge.svg");
+    const badge = renderToStaticMarkup(<MatchBadge model={fixture} portrait={false}/>);
+    expect(badge).toContain('left:888.396px');
+    expect(badge).toContain('top:491.926px');
+    const stylesheet = readFileSync(new URL("./game.css", import.meta.url), "utf8");
+    expect(stylesheet).toContain(".arcade-play-feedback-overlay{z-index:3;pointer-events:none}");
   });
 
   it("reserves a two-pixel gap between the right-aligned score and percent sign", () => {

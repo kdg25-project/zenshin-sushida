@@ -1,11 +1,11 @@
 import React, { type CSSProperties } from "react";
-import { hudNumericLayout, referenceTicketCopyLayout } from "../../lib/game-canvas-layout";
+import { gameCurrentPoseFrameSourceBounds, hudNumericLayout, playMatchBadgeRect, referenceTicketCopyLayout } from "../../lib/game-canvas-layout";
 import { POSE_THRESHOLD } from "../../lib/game-rules";
 import { sceneAssetPaths } from "../../lib/sf-ui-assets";
 import { sushiPixelSource } from "../../lib/sushi-art-2d";
 import type { PlaySceneVisual } from "./types";
 
-type Props = { model: PlaySceneVisual; portrait: boolean; suppressCountdown?: boolean };
+type Props = { model: PlaySceneVisual; portrait: boolean; suppressCountdown?: boolean; externalFeedback?: boolean };
 type SourceBounds = readonly [number, number, number, number];
 
 const SOURCE_SCALE = 1200 / 1920;
@@ -29,7 +29,7 @@ function SourceArt({ name, bounds, className }: { name: keyof typeof sceneAssetP
 
 function displayWord(word: string) { return Array.from(word.toUpperCase()); }
 
-export function GameScene({ model, portrait, suppressCountdown = false }: Props) {
+export function GameScene({ model, portrait, suppressCountdown = false, externalFeedback = false }: Props) {
   const letters = displayWord(model.word.romaji);
   const shownTimer = Number.isFinite(model.remaining) ? Math.max(0, model.remaining).toFixed(1) : "0.0";
 
@@ -47,7 +47,7 @@ export function GameScene({ model, portrait, suppressCountdown = false }: Props)
     <div className="game-scene-mobile-guide-frame" />
     <div className="game-scene-mobile-camera-frame" />
       <PosePanels model={model} compact />
-    {model.showFeedback !== false ? <Feedback model={model} compact /> : null}
+    {!externalFeedback && model.showFeedback !== false ? <MatchBadge model={model} portrait /> : null}
     {!suppressCountdown && model.countdown ? <div className="game-scene-countdown game-scene-countdown--compact"><span>ご用意！</span><strong>{model.countdown}</strong></div> : null}
     {model.showSkip ? <div className="game-scene-skip game-scene-skip--compact">このおすしを流す</div> : null}
     </section>;
@@ -81,8 +81,8 @@ export function GameScene({ model, portrait, suppressCountdown = false }: Props)
     <WordTiles letters={letters} letterIndex={model.letterIndex} />
     <ConveyorPreview words={model.beltWords} />
     <SourceArt name="gamePoseGuideFrameSource" bounds={[-675.5, 169.5, -115.5, 509.5]} className="game-scene-pose-frame" />
-    <SourceArt name="gameCurrentPoseFrameSource" bounds={[-95.5, 169.5, 709.5, 509.5]} className="game-scene-camera-frame" />
-    {model.showFeedback !== false ? <Feedback model={model} /> : null}
+    <SourceArt name="gameCurrentPoseFrameSource" bounds={gameCurrentPoseFrameSourceBounds} className="game-scene-camera-frame" />
+    {!externalFeedback && model.showFeedback !== false ? <MatchBadge model={model} portrait={false} /> : null}
     {!suppressCountdown && model.countdown ? <div className="game-scene-countdown"><span>ご用意！</span><strong>{model.countdown}</strong></div> : null}
     {model.showSkip ? <div className="game-scene-skip">このおすしを流す</div> : null}
   </section>;
@@ -158,14 +158,15 @@ function PosePanels({ model, compact = false }: { model: PlaySceneVisual; compac
   </>;
 }
 
-function Feedback({ model, compact = false }: { model: PlaySceneVisual; compact?: boolean }) {
+export function MatchBadge({ model, portrait }: { model: PlaySceneVisual; portrait: boolean }) {
   const accuracy = Number.isFinite(model.accuracy) ? Math.max(0, Math.min(100, Math.round(model.accuracy * 100))) : undefined;
   const tone = accuracy === undefined ? "unavailable" : accuracy >= Math.round(POSE_THRESHOLD * 100) ? "good" : accuracy >= 50 ? "okay" : "low";
   const status = accuracy === undefined
     ? "一致度を測定中"
     : model.hold ? `一致度 ${accuracy}%、キープ ${Math.round(model.hold)}%`
     : `一致度 ${accuracy}%、${model.hint || "ポーズをあわせよう"}`;
-  return <div className={["game-scene-feedback", compact && "game-scene-feedback--compact"].filter(Boolean).join(" ")} data-tone={tone} aria-label={status}>
+  const rect = playMatchBadgeRect(portrait);
+  return <div className={["game-scene-feedback", portrait && "game-scene-feedback--compact"].filter(Boolean).join(" ")} style={{ left:`${rect.x}px`, top:`${rect.y}px`, width:`${rect.width}px`, height:`${rect.height}px` }} data-tone={tone} aria-label={status}>
     <img src={sceneAssetPaths.gameMatchBadge} alt="" draggable={false} />
     <span>一致度</span><strong>{accuracy ?? "--"}</strong><b>%</b>
   </div>;

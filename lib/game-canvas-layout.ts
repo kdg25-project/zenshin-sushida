@@ -1,4 +1,6 @@
 export type Rect = { x: number; y: number; width: number; height: number };
+/** Native Illustrator artboard bounds for the desktop current-pose frame. */
+export const gameCurrentPoseFrameSourceBounds = [-95.5, 169.5, 709.5, 509.5] as const;
 export const GAME_WIDTH = 1200;
 /** Desktop follows the supplied 1920×1080 arcade reference without anisotropic scaling. */
 export const GAME_HEIGHT = 675;
@@ -24,12 +26,62 @@ export const desktopScene = {
   hudLeftLantern: { x: 0, y: 0, width: 94, height: 116 },
   hudRightLantern: { x: 1106, y: 0, width: 94, height: 116 },
   playGuide: { x: 190, y: 458, width: 330, height: 160 },
-  playCamera: { x: 550, y: 458, width: 480, height: 160 },
+  // These are the native Illustrator bounds of game-current-pose-frame-source.png
+  // converted from its 1920×1080 artboard to this 1200×675 stage.
+  playCamera: { x: 540.625, y: 443.75, width: 503.125, height: 212.5 },
   playFeedback: { x: 550, y: 624, width: 480, height: 34 },
   calibrationCamera: { x: 85, y: 125, width: 500, height: 270 },
   calibrationGuide: { x: 615, y: 125, width: 500, height: 270 },
   calibrationMessage: { x: 180, y: 414, width: 840, height: 46 },
 } as const satisfies Record<string, Rect>;
+
+/** The portrait play composition uses the same camera-panel contract without source art. */
+export const playCameraPanel = {
+  desktop: desktopScene.playCamera,
+  portrait: { x:300, y:450, width:270, height:177 },
+} as const satisfies Record<"desktop" | "portrait", Rect>;
+
+/** The match badge uses this same logical stage when it is lifted above live video. */
+export function playMatchBadgeRect(portrait: boolean): Rect {
+  return portrait
+    ? { x:495, y:458, width:124.988, height:31.25 }
+    : { x:888.396, y:491.926, width:124.988, height:31.25 };
+}
+
+/**
+ * The native play frame contains its caption and bevel.  Keep live pixels in
+ * its visible grey aperture, measured from the 805×340 source export, so the
+ * canvas overlay and DOM source frame cannot drift apart.
+ */
+const playCameraAperture = {
+  left:30 / 805,
+  // The grey aperture begins at y=63, but the native caption ends at y=88.
+  // Start below it with a 7px gap so a live camera can never cover the label.
+  top:95 / 340,
+  right:32 / 805,
+  bottom:33 / 340,
+} as const;
+
+/** Returns the drawable camera area inside its visual panel. */
+export function cameraVideoViewport(panel: Rect, kind: "calibration" | "play", portrait = false): Rect {
+  if (kind === "play" && !portrait) {
+    return {
+      x: panel.x + panel.width * playCameraAperture.left,
+      y: panel.y + panel.height * playCameraAperture.top,
+      width: panel.width * (1 - playCameraAperture.left - playCameraAperture.right),
+      height: panel.height * (1 - playCameraAperture.top - playCameraAperture.bottom),
+    };
+  }
+  if (kind === "play") {
+    // Compact play has a separate DOM caption above the aperture.
+    return { x:panel.x + 12, y:panel.y + 34, width:panel.width - 24, height:panel.height - 46 };
+  }
+  // The calibration and compact panels have no source-art caption inside the
+  // video area.  A symmetric inset keeps the person centred while preserving
+  // room for the drawn frame.
+  const inset = 12;
+  return { x:panel.x + inset, y:panel.y + inset, width:panel.width - inset * 2, height:panel.height - inset * 2 };
+}
 
 /** Fixed source-panel bounds for live play: keep the guide skeleton below its caption. */
 export const playGuidePanel = {
