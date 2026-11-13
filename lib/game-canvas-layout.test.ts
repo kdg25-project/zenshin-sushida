@@ -368,11 +368,27 @@ describe("game canvas layout", () => {
     for (const portrait of [false, true]) for (const word of SUSHI_WORDS) {
       const copy = referenceTicketCopyLayout(word, portrait);
       expect(copy.title.x + copy.title.width / 2).toBe(copy.romaji.x + copy.romaji.width / 2);
-      expect(copy.title.fontSize * Array.from(word.name).length).toBeLessThanOrEqual(copy.title.width * .9 + .001);
+      expect(copy.title.y + copy.title.height / 2).toBe(portrait ? 46.5 : 66.205);
+      expect(copy.title.fontSize * Array.from(word.name).length).toBeLessThanOrEqual(copy.title.width * (portrait ? .9 : .86) + .01);
       const romajiUnits = Array.from(word.romaji).length * .7 + Math.max(0, Array.from(word.romaji).length - 1) * .15;
       expect(copy.romaji.fontSize * romajiUnits).toBeLessThanOrEqual(copy.romaji.width * .94 + .001);
       expect(copy.title.fontSize).toBeGreaterThanOrEqual(portrait ? 19 : 24);
       expect(copy.romaji.fontSize).toBeGreaterThanOrEqual(11);
+    }
+  });
+
+  it("keeps every desktop title clear of the printed ticket ornaments after letter spacing", () => {
+    // Measured from game-current-sushi-ticket-frame.svg after its 7.54px
+    // inset and .625 scale: these are the ornaments' inner edges.
+    const ornamentSafeBand = { left: 265.04, right: 470.04 };
+    const titleTracking = .02;
+    for (const word of SUSHI_WORDS) {
+      const title = referenceTicketCopyLayout(word, false).title;
+      const advance = title.fontSize * Array.from(word.name).length * (1 + titleTracking);
+      const left = title.x + title.width / 2 - advance / 2;
+      const right = title.x + title.width / 2 + advance / 2;
+      expect(left).toBeGreaterThanOrEqual(ornamentSafeBand.left);
+      expect(right).toBeLessThanOrEqual(ornamentSafeBand.right);
     }
   });
 

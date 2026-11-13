@@ -46,8 +46,16 @@ describe("GameScene", () => {
   it("fits a legitimate longer Japanese sushi title without an ellipsis", () => {
     const markup = renderToStaticMarkup(<GameScene model={{ ...fixture, word:{ id:"negitoro", name:"ねぎとろ", romaji:"NEGITORO" } }} portrait={false}/>);
     expect(markup).toContain("ねぎとろ");
-    expect(markup).toContain("--ticket-name-size:51.75px");
+    expect(markup).toContain("--ticket-name-size:49.45px");
     expect(markup).not.toContain("text-overflow:ellipsis");
+  });
+
+  it("keeps every desktop ticket title in the ornament-centred band", () => {
+    const markup = renderToStaticMarkup(<GameScene model={{ ...fixture, word:{ id:"koontuna", name:"コーンツナ", romaji:"KOONTUNA" } }} portrait={false}/>);
+    expect(markup).toContain("--ticket-copy-left:252.54px");
+    expect(markup).toContain("--ticket-title-top:34.205px");
+    expect(markup).toContain("--ticket-title-height:64px");
+    expect(markup).toContain("KOONTUNA");
   });
 
   it("fits the longest canonical Japanese title in the compact game ticket", () => {

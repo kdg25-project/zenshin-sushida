@@ -39,6 +39,7 @@
 .game-scene-ticket--compact .game-scene-ticket-copy strong,.game-scene-ticket--compact .game-scene-ticket-copy span{position:absolute;left:var(--ticket-copy-left);width:var(--ticket-copy-width);text-align:center}
 .game-scene-ticket--compact .game-scene-ticket-copy strong{top:var(--ticket-title-top);font-size:var(--ticket-name-size)}
 .game-scene-ticket--compact .game-scene-ticket-copy span{top:var(--ticket-romaji-top);font-size:var(--ticket-romaji-size);letter-spacing:.15em}
+.game-scene-ticket[data-source] .game-scene-ticket-copy strong,.game-scene-ticket--compact .game-scene-ticket-copy strong{height:var(--ticket-title-height);display:grid;place-items:center;line-height:1}
 .game-scene-feedback--compact{left:495px;top:458px;transform-origin:top left;transform:scale(.544)}
 
 /* Standalone fixtures retain this stack order; production lifts countdown above canvas in GameCanvas. */

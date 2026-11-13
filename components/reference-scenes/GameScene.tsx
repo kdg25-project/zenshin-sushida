@@ -130,6 +130,7 @@ function Ticket({ model, compact = false }: { model: PlaySceneVisual; compact?: 
     "--ticket-copy-left": `${copy.content.x}px`,
     "--ticket-copy-width": `${copy.content.width}px`,
     "--ticket-title-top": `${copy.title.y}px`,
+    "--ticket-title-height": `${copy.title.height}px`,
     "--ticket-romaji-top": `${copy.romaji.y}px`,
     "--ticket-name-size": `${copy.title.fontSize}px`,
     "--ticket-romaji-size": `${copy.romaji.fontSize}px`,

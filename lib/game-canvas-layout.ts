@@ -118,17 +118,26 @@ type ReferenceTicketWord = { name: string; romaji: string };
 export function referenceTicketCopyLayout(word: ReferenceTicketWord, portrait: boolean) {
   const content = portrait
     ? { x: 170, y: 0, width: 288, height: 127 }
-    : { x: 270, y: 0, width: 230, height: 166 };
+    // The supplied desktop frame's two kamon ornaments are centred at x=576
+    // in its 853.87px source. After the frame's 7.54px inset and .625 scale,
+    // this is x=367.54px in the 1200px scene, which leaves equal clearance
+    // for the longest title on either side.
+    : { x: 252.54, y: 0, width: 230, height: 166 };
   const titlePreferred = portrait ? 37 : 59.963;
   const titleMinimum = portrait ? 19 : 24;
-  const titleSize = Math.max(titleMinimum, Math.min(titlePreferred, content.width * .9 / Math.max(1, Array.from(word.name).length)));
+  // Account for the desktop title's .02em tracking as well as the glyph
+  // widths; .90 let its longest labels touch the printed kamon ornaments.
+  const titleLimit = portrait ? .9 : .86;
+  const titleSize = Math.round(Math.max(titleMinimum, Math.min(titlePreferred, content.width * titleLimit / Math.max(1, Array.from(word.name).length))) * 1000) / 1000;
   const romajiPreferred = portrait ? 18 : 20.142;
   // Approximate the source type's glyph plus .15em tracking to keep all 32 labels inside the column.
   const romajiUnits = Math.max(1, Array.from(word.romaji).length * .7 + Math.max(0, Array.from(word.romaji).length - 1) * .15);
   const romajiSize = Math.max(11, Math.min(romajiPreferred, content.width * .94 / romajiUnits));
   return {
     content,
-    title: { x: content.x, y: portrait ? 25 : 28, width: content.width, height: portrait ? 43 : 64, fontSize: titleSize },
+    // Centre the title in its band. A fixed top edge made smaller long titles
+    // visibly climb above the frame ornaments.
+    title: { x: content.x, y: portrait ? 25 : 34.205, width: content.width, height: portrait ? 43 : 64, fontSize: titleSize },
     romaji: { x: content.x, y: portrait ? 80 : 106, width: content.width, height: portrait ? 25 : 32, fontSize: romajiSize },
   };
 }
