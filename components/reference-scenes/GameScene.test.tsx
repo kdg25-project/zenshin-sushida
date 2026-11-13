@@ -1,4 +1,5 @@
 import React from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { GameScene } from "./GameScene";
@@ -55,5 +56,28 @@ describe("GameScene", () => {
     expect(markup).toContain("game-scene-countdown");
     const suppressed = renderToStaticMarkup(<GameScene model={countdownModel} portrait={false} suppressCountdown/>);
     expect(suppressed).not.toContain("game-scene-countdown");
+  });
+
+  it("uses the supplied right-corner badge and changes its score colour at the match bands", () => {
+    const markup = (accuracy: number) => renderToStaticMarkup(<GameScene model={{ ...fixture, accuracy }} portrait={false}/>);
+    expect(markup(0)).toContain('src="/assets/illustrator-v3/game-match-badge.svg"');
+    expect(markup(0)).toContain('<strong>0</strong>');
+    expect(markup(.49)).toContain('data-tone="low"');
+    expect(markup(.5)).toContain('data-tone="okay"');
+    expect(markup(.71)).toContain('data-tone="okay"');
+    expect(markup(.72)).toContain('data-tone="good"');
+    expect(markup(1)).toContain('<strong>100</strong>');
+    expect(markup(1)).toContain('data-tone="good"');
+    expect(markup(Number.NaN)).toContain('data-tone="unavailable"');
+    expect(markup(Number.NaN)).toContain("--");
+  });
+
+  it("reserves a two-pixel gap between the right-aligned score and percent sign", () => {
+    const stylesheet = readFileSync(new URL("./game.css", import.meta.url), "utf8");
+    expect(stylesheet).toContain(".game-scene-feedback>strong{right:26.228px;");
+    expect(stylesheet).toContain(".game-scene-feedback>b{left:100.76px;");
+    const scoreRight = 124.988 - 26.228;
+    expect(100.76 - scoreRight).toBeCloseTo(2, 6);
+    expect(stylesheet).toContain(".game-scene-feedback--compact{left:495px;top:458px;transform-origin:top left;transform:scale(.544)}");
   });
 });

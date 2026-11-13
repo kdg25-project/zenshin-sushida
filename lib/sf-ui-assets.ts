@@ -9,6 +9,7 @@ export const sceneAssetPaths = {
   gameDecorRight: "/assets/illustrator-v3/game-decor-right.svg",
   gamePoseGuideFrameSource: "/assets/illustrator-v3/game-pose-guide-frame-source.png",
   gameCurrentPoseFrameSource: "/assets/illustrator-v3/game-current-pose-frame-source.png",
+  gameMatchBadge: "/assets/illustrator-v3/game-match-badge.svg",
   gameBgTop: "/assets/illustrator-v3/game-bg-top.svg",
   gameConveyorTrack: "/assets/illustrator-v3/game-conveyor-track.svg",
   gameConveyorUpperRail: "/assets/illustrator-v3/game-conveyor-upper-rail.svg",

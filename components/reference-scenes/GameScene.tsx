@@ -1,5 +1,6 @@
 import React, { type CSSProperties } from "react";
 import { hudNumericLayout, referenceTicketCopyLayout } from "../../lib/game-canvas-layout";
+import { POSE_THRESHOLD } from "../../lib/game-rules";
 import { sceneAssetPaths } from "../../lib/sf-ui-assets";
 import { sushiPixelSource } from "../../lib/sushi-art-2d";
 import type { PlaySceneVisual } from "./types";
@@ -158,9 +159,14 @@ function PosePanels({ model, compact = false }: { model: PlaySceneVisual; compac
 }
 
 function Feedback({ model, compact = false }: { model: PlaySceneVisual; compact?: boolean }) {
-  const accuracy = Math.max(0, Math.min(100, Math.round(model.accuracy * 100)));
-  return <div className={["game-scene-feedback", compact && "game-scene-feedback--compact"].filter(Boolean).join(" ")}>
-    <div><span>一致度 {accuracy}%</span>{model.hold ? <b>キープ {Math.round(model.hold)}%</b> : <em>{model.hint || "ポーズをあわせよう"}</em>}</div>
-    <i><i style={{ width: `${accuracy}%` }} /></i>
+  const accuracy = Number.isFinite(model.accuracy) ? Math.max(0, Math.min(100, Math.round(model.accuracy * 100))) : undefined;
+  const tone = accuracy === undefined ? "unavailable" : accuracy >= Math.round(POSE_THRESHOLD * 100) ? "good" : accuracy >= 50 ? "okay" : "low";
+  const status = accuracy === undefined
+    ? "一致度を測定中"
+    : model.hold ? `一致度 ${accuracy}%、キープ ${Math.round(model.hold)}%`
+    : `一致度 ${accuracy}%、${model.hint || "ポーズをあわせよう"}`;
+  return <div className={["game-scene-feedback", compact && "game-scene-feedback--compact"].filter(Boolean).join(" ")} data-tone={tone} aria-label={status}>
+    <img src={sceneAssetPaths.gameMatchBadge} alt="" draggable={false} />
+    <span>一致度</span><strong>{accuracy ?? "--"}</strong><b>%</b>
   </div>;
 }
