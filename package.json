@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.1",
-    "@vladmandic/human": "3.3.6",
+    "js-aruco2": "2.0.0",
     "next": "15.5.28",
     "react": "19.1.1",
     "react-dom": "19.1.1",

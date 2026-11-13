@@ -5,7 +5,7 @@ import { Miniflare } from "miniflare";
 import { encodePreview } from "../lib/booth-preview";
 
 type Socket = { accept: () => void; close: (code?: number, reason?: string) => void; send: (message: string|ArrayBuffer) => void; addEventListener: (type: "message" | "close", listener: (event: { data?: string|ArrayBuffer; code?: number }) => void) => void };
-type Snapshot = { revision: number; round: number; wordIndex: number; phase: "menu" | "camera" | "ready" | "countdown" | "playing" | "result"; name: string; cameraMessage: string; remaining: number; score: number; currentSushi: string; currentLetter: string; rankingEligible: boolean; submitted: boolean; registrationMessage: string; hostSeenAt: number; controllerCount: number; playerTracking:string; selectionRequired:boolean };
+type Snapshot = { revision: number; round: number;  wordIndex: number;  phase: "menu" | "camera" | "ready" | "countdown" | "playing" | "result"; name: string; cameraMessage: string; remaining: number; score: number; currentSushi: string; currentLetter: string; rankingEligible: boolean; submitted: boolean; registrationMessage: string; hostSeenAt: number; controllerCount: number; playerTracking:string; selectionRequired:boolean;selectedMarkerId?:number;markerTrackingPhase?:"unselected"|"tracking"|"marker-occluded"|"reconfirm-required"|"duplicate"|"ambiguous";markerMessage?:string;markerSelectionGeneration?:number;reconfirmationRequired?:boolean };
 
 const password = "festival-test-password";
 const hostToken = "h".repeat(48);
@@ -169,22 +169,28 @@ describe("booth WebSocket coordination", () => {
     } finally { await mf.dispose(); }
   });
 
-  it("accepts only a recent preview candidate before play and waits for the host acknowledgement", async () => {
+  it("forwards only a recent confirmation for the preselected marker and does not forward target override payload", async () => {
     const mf=await worker();try{
       const {roomId}=await createRoom(mf);await joinRoom(mf,controllerOne);
       const host=await connect(mf,roomId),hostInbox=messages(host),controller=await connect(mf,roomId),controllerInbox=messages(controller);
       await authenticate(host,hostInbox,hostToken);await authenticate(controller,controllerInbox,controllerOne);
-      host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({phase:"camera",playerTracking:"選択待ち",selectionRequired:true})}));const current=await nextState(controllerInbox,value=>value.playerTracking==="選択待ち");
+      host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({phase:"camera",playerTracking:"追跡中",selectionRequired:false,selectedMarkerId:0,markerTrackingPhase:"tracking",markerSelectionGeneration:4,reconfirmationRequired:false})}));const tracking=await nextState(controllerInbox,value=>value.playerTracking==="追跡中");
+      controller.send(JSON.stringify({type:"command",id:"tracking-player-command-001",kind:"reconfirm-player",round:tracking.round,revision:tracking.revision,frameId:7,markerSelectionGeneration:4}));
+      expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"tracking-player-command-001",status:"rejected",code:"STALE_STATE"});
+      host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({phase:"camera",playerTracking:"選択待ち",selectionRequired:true,selectedMarkerId:0,markerTrackingPhase:"reconfirm-required",markerSelectionGeneration:4,reconfirmationRequired:true})}));const current=await nextState(controllerInbox,value=>value.playerTracking==="選択待ち");
       controller.send(JSON.stringify({type:"preview-subscribe",enabled:true}));
-      host.send(encodePreview({frameId:7,capturedAt:1,width:1,height:1,image:new Uint8Array([1]),candidates:[{id:"p1",head:{x:.5,y:.2},bones:[]}]}));
-      controller.send(JSON.stringify({type:"command",id:"invalid-player-command-001",kind:"select-player",round:current.round,revision:0,candidateId:"not-a-candidate",frameId:-1}));
+      host.send(encodePreview({frameId:7,capturedAt:1,width:1,height:1,image:new Uint8Array([1]),candidates:[{id:"p1",head:{x:.5,y:.2},bones:[],markerId:0,markerAssociation:"matched"}],markers:[{id:0,corners:[[.1,.1],[.2,.1],[.2,.2],[.1,.2]],association:"matched",candidateId:"p1"}]}));
+      controller.send(JSON.stringify({type:"command",id:"invalid-player-command-001",kind:"reconfirm-player",round:current.round,revision:0,frameId:-1,markerSelectionGeneration:4,candidateId:"not-a-candidate",markerId:1}));
       expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"invalid-player-command-001",status:"rejected",code:"INVALID_PLAYER"});
-      controller.send(JSON.stringify({type:"command",id:"valid-player-command-0001",kind:"select-player",round:current.round,revision:0,candidateId:"p1",frameId:7}));
-      expect(await hostInbox.nextType("command")).toMatchObject({id:"valid-player-command-0001",kind:"select-player",candidateId:"p1",frameId:7});
+      controller.send(JSON.stringify({type:"command",id:"valid-player-command-0001",kind:"reconfirm-player",round:current.round,revision:0,frameId:7,markerSelectionGeneration:4,candidateId:"p1",markerId:0}));
+      const initialReconfirm=await hostInbox.nextType("command");expect(initialReconfirm).toMatchObject({id:"valid-player-command-0001",kind:"reconfirm-player",frameId:7,markerSelectionGeneration:4});expect(initialReconfirm).not.toHaveProperty("candidateId");expect(initialReconfirm).not.toHaveProperty("markerId");
       host.send(JSON.stringify({type:"ack",id:"valid-player-command-0001",status:"done"}));expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"valid-player-command-0001",status:"done"});
-      host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({phase:"playing"})}));const playing=await nextState(controllerInbox,value=>value.phase==="playing");
-      controller.send(JSON.stringify({type:"command",id:"locked-player-command-0001",kind:"select-player",round:playing.round,revision:0,candidateId:"p1",frameId:7}));
-      expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"locked-player-command-0001",status:"rejected",code:"STALE_STATE"});
+      host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({phase:"playing",selectionRequired:true,selectedMarkerId:0,markerTrackingPhase:"reconfirm-required",markerSelectionGeneration:4,reconfirmationRequired:true})}));const playing=await nextState(controllerInbox,value=>value.phase==="playing");
+      controller.send(JSON.stringify({type:"command",id:"stale-player-command-0001",kind:"reconfirm-player",round:playing.round,revision:0,frameId:7,markerSelectionGeneration:3}));
+      expect(await controllerInbox.nextType("command-result")).toMatchObject({id:"stale-player-command-0001",status:"rejected",code:"STALE_SELECTION"});
+      controller.send(JSON.stringify({type:"command",id:"reconfirm-player-command-0001",kind:"reconfirm-player",round:playing.round,revision:0,frameId:7,markerSelectionGeneration:4,candidateId:"p1",markerId:0}));
+      expect(await hostInbox.nextType("command")).toMatchObject({id:"reconfirm-player-command-0001",kind:"reconfirm-player",frameId:7,markerSelectionGeneration:4});
+      const closed=new Promise<{code?:number}>(resolve=>host.addEventListener("close",resolve));host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({selectedMarkerId:2})}));expect((await closed).code).toBe(1008);
     }finally{await mf.dispose();}
   });
 

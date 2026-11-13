@@ -1,3 +1,3 @@
 import { describe,expect,it } from "vitest";
-import { projectPreviewBones } from "./preview-projection";
-describe("preview bone projection",()=>it("mirrors same-frame normalized camera bones",()=>{const line=projectPreviewBones([{id:"p1",head:{x:.5,y:.2},bones:[[.1,.2,.8,.9]]}],320,180)[0];expect(line).toMatchObject({candidateId:"p1",x1:288,y1:36,y2:162});expect(line.x2).toBeCloseTo(64);}));
+import { projectPreviewBones, projectPreviewMarkers } from "./preview-projection";
+describe("preview projection",()=>{it("mirrors same-frame normalized camera bones",()=>{const line=projectPreviewBones([{id:"p1",head:{x:.5,y:.2},bones:[[.1,.2,.8,.9]]}],320,180)[0];expect(line).toMatchObject({candidateId:"p1",x1:288,y1:36,y2:162});expect(line.x2).toBeCloseTo(64);});it("mirrors all four marker corners exactly once",()=>{const marker=projectPreviewMarkers([{id:12,corners:[[.1,.2],[.2,.2],[.2,.3],[.1,.3]],association:"matched",candidateId:"p1"}],320,180)[0];expect(marker).toMatchObject({id:12,association:"matched",candidateId:"p1"});expect(marker.points).toEqual([{x:288,y:36},{x:256,y:36},{x:256,y:54},{x:288,y:54}]);});});

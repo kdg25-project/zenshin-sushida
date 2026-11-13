@@ -1,31 +1,32 @@
 declare const WebSocketPair: any;
 import { decodePreview, previewLimits } from "../lib/booth-preview";
+import { isPrintedMarkerId } from "../lib/aruco-types";
 
 /** Per-display transient coordination. Controllers request commands and wait
  * for a display acknowledgement; camera, game, and ranking secrets stay PC-side. */
 export type BoothPhase = "menu" | "camera" | "ready" | "countdown" | "playing" | "result";
-export type BoothCommandKind = "set-name" | "prepare" | "start" | "skip" | "submit" | "next" | "select-player";
-export type BoothSnapshot = { revision:number; round:number; wordIndex:number; phase:BoothPhase; name:string; cameraMessage:string; remaining:number; score:number; currentSushi:string; currentLetter:string; rankingEligible:boolean; submitted:boolean; registrationMessage:string; hostSeenAt:number; controllerCount:number; playerTracking:string; selectionRequired:boolean };
-export type BoothCommand = { id:string; kind:BoothCommandKind; round:number; word?:number; name?:string; candidateId?:string; frameId?:number; createdAt:number; expiresAt:number };
+export type BoothCommandKind = "set-name" | "prepare" | "start" | "skip"  | "submit" | "next" | "reconfirm-player";
+export type MarkerTrackingPhase = "unselected"|"tracking"|"marker-occluded"|"reconfirm-required"|"duplicate"|"ambiguous";
+export type BoothSnapshot = { revision:number; round:number; wordIndex:number; phase:BoothPhase; name:string; cameraMessage:string; remaining:number; score:number; currentSushi:string; currentLetter:string; rankingEligible:boolean; submitted:boolean; registrationMessage:string; hostSeenAt:number; controllerCount:number; playerTracking:string; selectionRequired:boolean; selectedMarkerId?:number; markerTrackingPhase?:MarkerTrackingPhase; markerMessage?:string; markerSelectionGeneration?:number; reconfirmationRequired?:boolean };
+export type BoothCommand = { id:string; kind:BoothCommandKind; round:number; word?:number;wordIndex?:number;name?:string; frameId?:number; markerSelectionGeneration?:number; createdAt:number; expiresAt:number };
 type Complete = { at:number; status:"done"|"rejected"; code:string; message:string };
 type Room = { code:string; hostToken:string; nonce:string; expiresAt:number; snapshot:BoothSnapshot; controllers:Record<string,number>; pending?:BoothCommand; completed:Record<string,Complete>; joins:number[]; activeHost?:string };
 type Attachment = { role:"pending"|"host"|"controller"; nonce?:string; token?:string; connectionId?:string; deadline?:number; preview?:boolean; previewFrameId?:number; previewSentAt?:number };
 
-const HOURS_12=12*60*60*1000, HOST_STALE=6_000, COMMAND_TTL=8_000, CONTROLLER_TTL=70_000, AUTH_DEADLINE=8_000, MAX_CONTROLLERS=12, MAX_SOCKETS=16;
-const phases:BoothPhase[]=["menu","camera","ready","countdown","playing","result"];
-const kinds:BoothCommandKind[]=["set-name","prepare","start","skip","submit","next","select-player"];
+const HOURS_12=12*60*60*1000, HOST_STALE=6_000, COMMAND_TTL=8_000, CONTROLLER_TTL=70_000, AUTH_DEADLINE=8_000, MAX_CONTROLLERS=12, MAX_SOCKETS=16;const phases:BoothPhase[]=["menu","camera","ready","countdown","playing","result"];
+const kinds:BoothCommandKind[]=["set-name","prepare","start","skip","submit","next","reconfirm-player"];
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const constantTime=(a:string,b:string)=>{if(a.length!==b.length)return false;let changed=0;for(let i=0;i<a.length;i++)changed|=a.charCodeAt(i)^b.charCodeAt(i);return changed===0;};
 const validToken=(value:unknown):value is string=>typeof value==="string"&&value.length>=32&&value.length<=160;
 const validId=(value:unknown):value is string=>typeof value==="string"&&/^[a-zA-Z0-9_-]{12,80}$/.test(value);
 const randomId=()=>crypto.randomUUID()+crypto.randomUUID();
 const read=async<T>(request:Request)=>{try{return await request.json() as T;}catch{return undefined;}};
-const allowed=(kind:BoothCommandKind,s:BoothSnapshot)=>kind==="set-name"?["menu","camera","ready"].includes(s.phase):kind==="select-player"?["camera","ready"].includes(s.phase):kind==="prepare"?["menu","camera"].includes(s.phase):kind==="start"?s.phase==="ready":kind==="skip"?s.phase==="playing":kind==="submit"?s.phase==="result"&&s.rankingEligible&&!s.submitted:kind==="next";
+const allowed=(kind:BoothCommandKind,s:BoothSnapshot)=>kind==="set-name"?["menu","camera","ready"].includes(s.phase):kind==="reconfirm-player"?["camera","ready","countdown","playing"].includes(s.phase)&&s.selectionRequired&&s.reconfirmationRequired===true:kind==="prepare"?["menu","camera"].includes(s.phase):kind==="start"?s.phase==="ready":kind==="skip"?s.phase==="playing":kind==="submit"?s.phase==="result"&&s.rankingEligible&&!s.submitted:kind==="next";
 
 export class BoothRoom {
   /** Preview bytes never enter durable storage. This bounded receipt cache only
    * proves that a controller click belongs to the current host connection. */
-  private previewFrames=new Map<string,Array<{frameId:number;candidateIds:Set<string>;receivedAt:number}>>();
+  private previewFrames=new Map<string,Array<{frameId:number;markerCandidates:Set<string>;receivedAt:number}>>();
   private previewSentAt=new Map<string,number>();
   constructor(private state:any) {}
   private async get(){return await this.state.storage.get("room") as Room|undefined;}
@@ -80,7 +81,10 @@ export class BoothRoom {
       const frame=decodePreview(message),last=this.previewSentAt.get(connectionId)??0;
       if(!frame||now-last<1_000/previewLimits.maxFps){socket.close(1008,"invalid preview");return;}
       this.previewSentAt.set(connectionId,now);
-      const history=[...(this.previewFrames.get(connectionId)??[]).filter(item=>item.receivedAt>now-4_000),{frameId:frame.frameId,candidateIds:new Set(frame.candidates.map(item=>item.id)),receivedAt:now}].slice(-6);
+      const markers=frame.markers??[],markerCounts=new Map<number,number>(),candidateCounts=new Map<string,number>();
+      for(const marker of markers){markerCounts.set(marker.id,(markerCounts.get(marker.id)??0)+1);if(marker.candidateId)candidateCounts.set(marker.candidateId,(candidateCounts.get(marker.candidateId)??0)+1);}
+      const markerCandidates=new Set(markers.filter(marker=>marker.association==="matched"&&typeof marker.candidateId==="string"&&markerCounts.get(marker.id)===1&&candidateCounts.get(marker.candidateId)===1).map(marker=>`${marker.id}:${marker.candidateId}`));
+      const history=[...(this.previewFrames.get(connectionId)??[]).filter(item=>item.receivedAt>now-2_000),{frameId:frame.frameId,markerCandidates,receivedAt:now}].slice(-4);
       this.previewFrames.set(connectionId,history);
       let subscribersChanged=false;
       for(const target of this.sockets()){
@@ -101,8 +105,7 @@ export class BoothRoom {
     if(input?.type==="ping"){await this.put(room);this.send(socket,{type:"pong",snapshot:room.snapshot,online:this.liveHost(room,now)});return;}
     if(attachment.role==="host"){
       if(attachment.connectionId!==room.activeHost){socket.close(4001,"replaced");return;}
-      if(input?.type==="end-session"){if(!validId(input.id)){socket.close(1008,"invalid end");return;}this.send(socket,{type:"command-result",id:input.id,status:"done",code:"SESSION_ENDED",message:"スタッフ操作を終了しました"});await this.revoke(room);return;}
-      if(input?.type==="snapshot"){const s=input.snapshot as BoothSnapshot;if(!s||!Number.isInteger(s.round)||!Number.isInteger(s.wordIndex)||s.wordIndex<0||!phases.includes(s.phase)||typeof s.name!=="string"||s.name.length>20||typeof s.playerTracking!=="string"||s.playerTracking.length>100||typeof s.selectionRequired!=="boolean"){socket.close(1008,"invalid state");return;}if(room.pending&&room.pending.round!==s.round)this.invalidatePending(room,"ROUND_CHANGED","画面が変わったため、この操作は取り消されました");room.snapshot={...s,revision:room.snapshot.revision+1,hostSeenAt:now,controllerCount:Object.keys(room.controllers).length};await this.put(room);this.broadcast(this.stateMessage(room,now));return;}
+      if(input?.type==="end-session"){if(!validId(input.id)){socket.close(1008,"invalid end");return;}this.send(socket,{type:"command-result",id:input.id,status:"done",code:"SESSION_ENDED",message:"スタッフ操作を終了しました"});await this.revoke(room);return;}      if(input?.type==="snapshot"){const s=input.snapshot as BoothSnapshot;if(!s){socket.close(1008,"invalid state");return;}const validMarkerId=s.selectedMarkerId===undefined||isPrintedMarkerId(s.selectedMarkerId),validMarkerPhase=s.markerTrackingPhase===undefined||(["unselected","tracking","marker-occluded","reconfirm-required","duplicate","ambiguous"] as MarkerTrackingPhase[]).includes(s.markerTrackingPhase),validMarkerMessage=s.markerMessage===undefined||typeof s.markerMessage==="string"&&s.markerMessage.length<=100,validMarkerGeneration=s.markerSelectionGeneration===undefined||Number.isInteger(s.markerSelectionGeneration)&&s.markerSelectionGeneration>=0,validReconfirmationRequired=s.reconfirmationRequired===undefined||typeof s.reconfirmationRequired==="boolean";if(!Number.isInteger(s.round)||!Number.isInteger(s.wordIndex)||s.wordIndex<0||!phases.includes(s.phase)||typeof s.name!=="string"||s.name.length>20||typeof s.playerTracking!=="string"||s.playerTracking.length>100||typeof s.selectionRequired!=="boolean"||!validMarkerId||!validMarkerPhase||!validMarkerMessage||!validMarkerGeneration||!validReconfirmationRequired){socket.close(1008,"invalid state");return;}if(room.pending&&room.pending.round!==s.round)this.invalidatePending(room,"ROUND_CHANGED","画面が変わったため、この操作は取り消されました");room.snapshot={...s,revision:room.snapshot.revision+1,hostSeenAt:now,controllerCount:Object.keys(room.controllers).length};await this.put(room);this.broadcast(this.stateMessage(room,now));return;}
       if(input?.type==="ack"){if(room.pending&&input.id===room.pending.id){const status=input.status==="done"?"done":"rejected",code=typeof input.code==="string"?input.code.slice(0,48):status==="done"?"DONE":"REJECTED",message=typeof input.message==="string"?input.message.slice(0,100):"操作を完了できませんでした";this.complete(room,room.pending,status,code,message);await this.put(room);}return;}
       socket.close(1008,"not allowed");return;
     }
@@ -119,16 +122,18 @@ export class BoothRoom {
     if(!validId(id)||!kinds.includes(kind)){this.reject(socket,id,"INVALID_COMMAND","操作内容が不正です");return;}const known=room.completed[id];if(known){this.send(socket,{type:"command-result",id,...known});return;}
     if(!this.liveHost(room,now)){this.reject(socket,id,"HOST_OFFLINE","表示PCとの接続を待っています");await this.put(room);return;}
     if(!Number.isInteger(input.round)||input.round!==room.snapshot.round||!allowed(kind,room.snapshot)){this.reject(socket,id,"STALE_STATE","画面が変わりました。最新の状態を確認してください");return;}
-    if(kind!=="skip"&&kind!=="select-player"&&input.revision!==room.snapshot.revision){this.reject(socket,id,"STALE_STATE","画面が変わりました。最新の状態を確認してください");return;}
+    if(kind!=="skip"&&kind!=="reconfirm-player"&&input.revision!==room.snapshot.revision){this.reject(socket,id,"STALE_STATE","画面が変わりました。最新の状態を確認してください");return;}
     if(kind==="skip"&&(!Number.isInteger(input.targetIndex)||input.targetIndex!==room.snapshot.wordIndex)){this.reject(socket,id,"STALE_DISH","すでに次のおすしへ進んでいます");return;}
     if(kind==="set-name"&&(typeof input.name!=="string"||input.name.trim().length<1||input.name.trim().length>20)){this.reject(socket,id,"INVALID_NAME","名前は1〜20文字で入力してください");return;}
-    if(kind==="select-player"){
-      if(!Number.isInteger(input.frameId)||typeof input.candidateId!=="string"||!/^p[0-9]+$/.test(input.candidateId)){this.reject(socket,id,"INVALID_PLAYER","選択する人を確認してください");return;}
-      const frames=this.previewFrames.get(room.activeHost??"")??[],frame=frames.find(item=>item.frameId===input.frameId&&item.receivedAt>now-4_000);
-      if(!frame||!frame.candidateIds.has(input.candidateId)){this.reject(socket,id,"STALE_PREVIEW","映像を更新して、もう一度選択してください");return;}
+    if(kind==="reconfirm-player"){
+      if(!Number.isInteger(input.frameId)||input.frameId<0||!Number.isInteger(input.markerSelectionGeneration)||input.markerSelectionGeneration<0||!isPrintedMarkerId(room.snapshot.selectedMarkerId)||room.snapshot.reconfirmationRequired!==true){this.reject(socket,id,"INVALID_PLAYER","選択済みマーカーを確認してください");return;}
+      if(input.markerSelectionGeneration!==room.snapshot.markerSelectionGeneration){this.reject(socket,id,"STALE_SELECTION","選択状態が更新されました。映像を確認してください");return;}
+      const frames=this.previewFrames.get(room.activeHost??"")??[],frame=frames.find(item=>item.frameId===input.frameId&&item.receivedAt>now-2_000);
+      const prefix=`${room.snapshot.selectedMarkerId}:`,matches=frame?[...frame.markerCandidates].filter(item=>item.startsWith(prefix)):[];
+      if(matches.length!==1){this.reject(socket,id,"STALE_PREVIEW","選択済みマーカーと骨格の対応を確認して、もう一度お試しください");return;}
     }
     if(room.pending){if(room.pending.id===id)this.send(socket,{type:"command-received",id});else this.reject(socket,id,"COMMAND_BUSY","ほかの操作を反映中です");return;}
-    room.pending={id,kind,round:input.round,word:kind==="skip"?input.targetIndex:undefined,name:kind==="set-name"?input.name.trim():undefined,candidateId:kind==="select-player"?input.candidateId:undefined,frameId:kind==="select-player"?input.frameId:undefined,createdAt:now,expiresAt:now+COMMAND_TTL};await this.put(room);for(const target of this.sockets()){const auth=this.attachment(target);if(auth?.role==="host"&&auth.connectionId===room.activeHost)this.send(target,{type:"command",...room.pending});}this.send(socket,{type:"command-received",id});
+    room.pending={id,kind,round:input.round,word:kind==="skip"?input.targetIndex:undefined,name:kind==="set-name"?input.name.trim():undefined,frameId:kind==="reconfirm-player"?input.frameId:undefined,markerSelectionGeneration:kind==="reconfirm-player"?input.markerSelectionGeneration:undefined,createdAt:now,expiresAt:now+COMMAND_TTL};await this.put(room);for(const target of this.sockets()){const auth=this.attachment(target);if(auth?.role==="host"&&auth.connectionId===room.activeHost)this.send(target,{type:"command",...room.pending});}this.send(socket,{type:"command-received",id});
   }
 
   async webSocketClose(socket:any){const room=await this.get(),attachment=this.attachment(socket);if(!room||!attachment)return;const now=Date.now(),connectionId=attachment.connectionId;if(attachment.role==="host"&&attachment.nonce===room.nonce&&connectionId&&connectionId===room.activeHost){this.previewFrames.delete(connectionId);this.previewSentAt.delete(connectionId);room.activeHost=undefined;this.invalidatePending(room,"HOST_DISCONNECTED","表示PCとの接続が切れました");await this.put(room);this.broadcast(this.stateMessage(room,now));return;}if(attachment.role==="controller"&&attachment.token)room.controllers[attachment.token]=now-CONTROLLER_TTL-1;this.clean(room,now);await this.put(room);this.sendPreviewCount(room);}
