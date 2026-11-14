@@ -26,6 +26,7 @@ async function connect(mf: Miniflare, roomId: string) { const response = await m
 function messages(socket: Socket) { const values: unknown[] = [], waiters: Array<(value: unknown) => void> = []; socket.addEventListener("message", event => { if(typeof event.data!=="string")return;const value = JSON.parse(event.data); const waiter = waiters.shift(); if(waiter) waiter(value); else values.push(value); }); const next = () => values.length ? Promise.resolve(values.shift()) : new Promise<unknown>(resolve => waiters.push(resolve)); const nextType = async (type: string) => { for(;;) { const value = await next() as { type?: string }; if(value.type === type) return value as Record<string, unknown>; } }; return { nextType }; }
 async function authenticate(socket: Socket, inbox: ReturnType<typeof messages>, token: string) { socket.send(JSON.stringify({ type: "authenticate", token })); return await inbox.nextType("state") as { snapshot: Snapshot }; }
 async function nextState(inbox: ReturnType<typeof messages>, matches: (value: Snapshot) => boolean) { for(;;) { const value = await inbox.nextType("state") as { snapshot: Snapshot }; if(matches(value.snapshot)) return value.snapshot; } }
+async function nextSubscriberCount(inbox: ReturnType<typeof messages>, type: "preview-subscribers"|"diagnostic-subscribers", count: number) { for(;;) { const value=await inbox.nextType(type) as {count?:number};if(value.count===count)return; } }
 function snapshot(partial: Partial<Snapshot> = {}): Snapshot { return { revision: 0, round: 1, targetIndex:0, wordIndex: 0, letterIndex:0, phase: "menu", name: "", cameraMessage: "ready", remaining: 60, score: 0, currentSushi: "", currentLetter: "", rankingEligible: false, submitted: false, registrationMessage: "", hostSeenAt: Date.now(), controllerCount: 0, playerTracking: "追跡中", selectionRequired:false, ...partial }; }
 
 describe("booth WebSocket coordination", () => {
@@ -111,6 +112,19 @@ describe("booth WebSocket coordination", () => {
       host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({diagnostics:{lines:["x".repeat(121)],updatedAt:124}})}));
       expect((await closed).code).toBe(1008);
     } finally { await mf.dispose(); }
+  });
+
+  it("tracks diagnostics subscriptions independently of previews and clears them on disconnect", async () => {
+    const mf=await worker();try{
+      const {roomId}=await createRoom(mf);await joinRoom(mf,controllerOne);await joinRoom(mf,controllerTwo);
+      const host=await connect(mf,roomId),hostInbox=messages(host),first=await connect(mf,roomId),firstInbox=messages(first),second=await connect(mf,roomId),secondInbox=messages(second);
+      await authenticate(host,hostInbox,hostToken);await nextSubscriberCount(hostInbox,"preview-subscribers",0);await nextSubscriberCount(hostInbox,"diagnostic-subscribers",0);await authenticate(first,firstInbox,controllerOne);await authenticate(second,secondInbox,controllerTwo);
+      first.send(JSON.stringify({type:"diagnostics-subscribe",enabled:true}));await nextSubscriberCount(hostInbox,"preview-subscribers",0);await nextSubscriberCount(hostInbox,"diagnostic-subscribers",1);
+      second.send(JSON.stringify({type:"diagnostics-subscribe",enabled:true}));await nextSubscriberCount(hostInbox,"preview-subscribers",0);await nextSubscriberCount(hostInbox,"diagnostic-subscribers",2);
+      second.close();await nextSubscriberCount(hostInbox,"preview-subscribers",0);await nextSubscriberCount(hostInbox,"diagnostic-subscribers",1);
+      const closed=new Promise<{code?:number}>(resolve=>first.addEventListener("close",resolve));first.send(JSON.stringify({type:"diagnostics-subscribe",enabled:"yes"}));expect((await closed).code).toBe(1008);
+      await nextSubscriberCount(hostInbox,"preview-subscribers",0);await nextSubscriberCount(hostInbox,"diagnostic-subscribers",0);
+    }finally{await mf.dispose();}
   });
 
   it("keeps the extended snapshot envelope exclusive to the active host and caps it", async () => {

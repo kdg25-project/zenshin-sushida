@@ -12,7 +12,7 @@ export type BoothSnapshot = { revision:number; round:number; targetIndex:number;
 export type BoothCommand = { id:string; kind:BoothCommandKind; round:number; word?:number; targetIndex?:number; wordIndex?:number; letterIndex?:number; name?:string; frameId?:number; markerSelectionGeneration?:number; createdAt:number; expiresAt:number };
 type Complete = { at:number; status:"done"|"rejected"; code:string; message:string };
 type Room = { code:string; hostToken:string; nonce:string; expiresAt:number; generation:number; snapshot:BoothSnapshot; controllers:Record<string,number>; pending?:BoothCommand; completed:Record<string,Complete>; joins:number[]; activeHost?:string };
-type Attachment = { role:"pending"|"host"|"controller"; nonce?:string; token?:string; connectionId?:string; deadline?:number; preview?:boolean; previewFrameId?:number; previewSentAt?:number };
+type Attachment = { role:"pending"|"host"|"controller"; nonce?:string; token?:string; connectionId?:string; deadline?:number; preview?:boolean; diagnostics?:boolean; previewFrameId?:number; previewSentAt?:number };
 
 const HOURS_12=12*60*60*1000, HOST_STALE=6_000, COMMAND_TTL=8_000, CONTROLLER_TTL=70_000, AUTH_DEADLINE=8_000, MAX_CONTROLLERS=12, MAX_SOCKETS=16, GLOBAL_SYNC_INTERVAL=10_000, MAX_MESSAGE=2_000, MAX_HOST_SNAPSHOT_MESSAGE=6_500;
 const GLOBAL_ROOM_NAME="booth:global-session-generation", GLOBAL_PATH="/_booth-global/session-generation", GLOBAL_GENERATION_KEY="generation";
@@ -39,7 +39,8 @@ export class BoothRoom {
   private send(socket:any,value:unknown){try{socket.send(JSON.stringify(value));}catch{}}
   private broadcast(value:unknown){for(const socket of this.sockets())this.send(socket,value);}
   private previewSubscribers(room:Room){return this.sockets().filter(socket=>{const a=this.attachment(socket);return a?.role==="controller"&&a.preview&&a.nonce===room.nonce;}).length;}
-  private sendPreviewCount(room:Room){for(const socket of this.sockets()){const a=this.attachment(socket);if(a?.role==="host"&&a.connectionId===room.activeHost)this.send(socket,{type:"preview-subscribers",count:this.previewSubscribers(room)});}}
+  private diagnosticSubscribers(room:Room){return this.sockets().filter(socket=>{const a=this.attachment(socket);return a?.role==="controller"&&a.diagnostics&&a.nonce===room.nonce;}).length;}
+  private sendSubscriberCounts(room:Room){for(const socket of this.sockets()){const a=this.attachment(socket);if(a?.role==="host"&&a.connectionId===room.activeHost){this.send(socket,{type:"preview-subscribers",count:this.previewSubscribers(room)});this.send(socket,{type:"diagnostic-subscribers",count:this.diagnosticSubscribers(room)});}}}
   private closeAll(code:number,reason:string){for(const socket of this.sockets())try{socket.close(code,reason);}catch{}}
   private async schedule(room:Room){const sockets=this.sockets();if(sockets.length===0)return;const now=Date.now();let next=Math.min(room.expiresAt,now+GLOBAL_SYNC_INTERVAL);for(const socket of sockets){const attachment=this.attachment(socket);if(attachment?.role==="pending"&&attachment.deadline&&attachment.deadline>now)next=Math.min(next,attachment.deadline);}const staleAt=room.snapshot.hostSeenAt+HOST_STALE;if(room.activeHost&&room.snapshot.hostSeenAt&&staleAt>now)next=Math.min(next,staleAt);await this.state.storage.setAlarm(next);}
   private clean(room:Room,now:number){for(const token of Object.keys(room.controllers))if(room.controllers[token]<now-CONTROLLER_TTL)delete room.controllers[token];for(const [id,result] of Object.entries(room.completed))if(result.at<now-60_000)delete room.completed[id];if(room.pending&&room.pending.expiresAt<=now){const old=room.pending;room.pending=undefined;room.completed[old.id]={at:now,status:"rejected",code:"COMMAND_EXPIRED",message:"PCの応答期限が切れました"};this.broadcast({type:"command-result",id:old.id,...room.completed[old.id]});}room.snapshot.controllerCount=Object.keys(room.controllers).length;}
@@ -120,14 +121,14 @@ export class BoothRoom {
         if(auth.previewFrameId!==undefined){if((auth.previewSentAt??0)+2_000<=now){target.serializeAttachment({...auth,preview:false,previewFrameId:undefined,previewSentAt:undefined} satisfies Attachment);subscribersChanged=true;}continue;}
         try{target.send(message);target.serializeAttachment({...auth,previewFrameId:frame.frameId,previewSentAt:now} satisfies Attachment);}catch{target.serializeAttachment({...auth,preview:false,previewFrameId:undefined,previewSentAt:undefined} satisfies Attachment);subscribersChanged=true;}
       }
-      if(subscribersChanged)this.sendPreviewCount(room);
+      if(subscribersChanged)this.sendSubscriberCounts(room);
       return;
     }
     const activeHost=attachment?.role==="host"&&attachment.connectionId===room.activeHost;if(typeof message!=="string"||message.length>(activeHost?MAX_HOST_SNAPSHOT_MESSAGE:MAX_MESSAGE)){socket.close(1008,"invalid message");return;}let input:any;try{input=JSON.parse(message);}catch{socket.close(1008,"invalid message");return;}if(message.length>MAX_MESSAGE&&(!activeHost||input?.type!=="snapshot")){socket.close(1008,"invalid message");return;}
     if(!attachment||attachment.role==="pending"){
       if(input?.type!=="authenticate"||!validToken(input.token)){socket.close(1008,"authentication required");return;}const role=constantTime(input.token,room.hostToken)?"host":room.controllers[input.token]!==undefined?"controller":undefined;if(!role){socket.close(1008,"authentication failed");return;}
       const connectionId=randomId();if(role==="host"){this.invalidatePending(room,"HOST_REPLACED","表示PCが再接続したため、この操作は取り消されました");for(const other of this.sockets()){const prior=this.attachment(other);if(other!==socket&&prior?.role==="host"&&prior.nonce===room.nonce)other.close(4001,"replaced");}room.activeHost=connectionId;room.snapshot.hostSeenAt=now;}else room.controllers[input.token]=now;
-      socket.serializeAttachment({role,token:input.token,nonce:room.nonce,connectionId} satisfies Attachment);await this.put(room);this.send(socket,this.stateMessage(room,now));if(role==="host"){this.broadcast(this.stateMessage(room,now));this.sendPreviewCount(room);}return;
+      socket.serializeAttachment({role,token:input.token,nonce:room.nonce,connectionId} satisfies Attachment);await this.put(room);this.send(socket,this.stateMessage(room,now));if(role==="host"){this.broadcast(this.stateMessage(room,now));this.sendSubscriberCounts(room);}return;
     }
     if(attachment.nonce!==room.nonce){socket.close(1008,"session replaced");return;}if(attachment.role==="controller")room.controllers[attachment.token!]=now;
     if(input?.type==="ping"){await this.put(room);this.send(socket,{type:"pong",snapshot:room.snapshot,online:this.liveHost(room,now)});return;}
@@ -142,7 +143,11 @@ export class BoothRoom {
     if(attachment.role!=="controller"){socket.close(1008,"not allowed");return;}
     if(input?.type==="preview-subscribe"){
       if(typeof input.enabled!=="boolean"){socket.close(1008,"invalid preview subscription");return;}
-      socket.serializeAttachment({...attachment,preview:input.enabled,previewFrameId:undefined,previewSentAt:undefined} satisfies Attachment);this.sendPreviewCount(room);return;
+      socket.serializeAttachment({...attachment,preview:input.enabled,previewFrameId:undefined,previewSentAt:undefined} satisfies Attachment);this.sendSubscriberCounts(room);return;
+    }
+    if(input?.type==="diagnostics-subscribe"){
+      if(typeof input.enabled!=="boolean"){socket.close(1008,"invalid diagnostics subscription");return;}
+      socket.serializeAttachment({...attachment,diagnostics:input.enabled} satisfies Attachment);this.sendSubscriberCounts(room);return;
     }
     if(input?.type==="preview-ack"){
       if(!Number.isInteger(input.frameId)||attachment.previewFrameId!==input.frameId)return;
@@ -167,6 +172,6 @@ export class BoothRoom {
     room.pending={id,kind,round:input.round,word:kind==="skip"?input.targetIndex:undefined,targetIndex:kind==="solve-letter"?input.targetIndex:undefined,wordIndex:kind==="solve-letter"?input.wordIndex:undefined,letterIndex:kind==="solve-letter"?input.letterIndex:undefined,name:kind==="set-name"?input.name.trim():undefined,frameId:kind==="reconfirm-player"?input.frameId:undefined,markerSelectionGeneration:kind==="reconfirm-player"?input.markerSelectionGeneration:undefined,createdAt:now,expiresAt:now+COMMAND_TTL};await this.put(room);for(const target of this.sockets()){const auth=this.attachment(target);if(auth?.role==="host"&&auth.connectionId===room.activeHost)this.send(target,{type:"command",...room.pending});}this.send(socket,{type:"command-received",id});
   }
 
-  async webSocketClose(socket:any){const room=await this.get(),attachment=this.attachment(socket);if(!room||!attachment)return;try{if(await this.isRevoked(room)){await this.revoke(room,"global session reset");return;}}catch{return;}const now=Date.now(),connectionId=attachment.connectionId;if(attachment.role==="host"&&attachment.nonce===room.nonce&&connectionId&&connectionId===room.activeHost){this.previewFrames.delete(connectionId);this.previewSentAt.delete(connectionId);room.activeHost=undefined;this.invalidatePending(room,"HOST_DISCONNECTED","表示PCとの接続が切れました");await this.put(room);this.broadcast(this.stateMessage(room,now));return;}if(attachment.role==="controller"&&attachment.token)room.controllers[attachment.token]=now-CONTROLLER_TTL-1;this.clean(room,now);await this.put(room);this.sendPreviewCount(room);}
+  async webSocketClose(socket:any){const room=await this.get(),attachment=this.attachment(socket);if(!room||!attachment)return;try{if(await this.isRevoked(room)){await this.revoke(room,"global session reset");return;}}catch{return;}const now=Date.now(),connectionId=attachment.connectionId;if(attachment.role==="host"&&attachment.nonce===room.nonce&&connectionId&&connectionId===room.activeHost){this.previewFrames.delete(connectionId);this.previewSentAt.delete(connectionId);room.activeHost=undefined;this.invalidatePending(room,"HOST_DISCONNECTED","表示PCとの接続が切れました");await this.put(room);this.broadcast(this.stateMessage(room,now));return;}if(attachment.role==="controller"&&attachment.token)room.controllers[attachment.token]=now-CONTROLLER_TTL-1;this.clean(room,now);await this.put(room);this.sendSubscriberCounts(room);}
   async alarm(){const room=await this.get();if(!room)return;try{if(await this.isRevoked(room)){await this.revoke(room,"global session reset");return;}}catch{if(this.sockets().length>0)await this.state.storage.setAlarm(Date.now()+GLOBAL_SYNC_INTERVAL);return;}const now=Date.now();if(room.expiresAt<=now){await this.revoke(room,"expired");return;}for(const socket of this.sockets()){const attachment=this.attachment(socket);if(attachment?.role==="pending"&&attachment.deadline!==undefined&&attachment.deadline<=now)socket.close(1008,"authentication timeout");}if(room.activeHost&&room.snapshot.hostSeenAt+HOST_STALE<=now){const oldHost=room.activeHost;room.activeHost=undefined;this.invalidatePending(room,"HOST_DISCONNECTED","表示PCとの接続が切れました");for(const socket of this.sockets()){const attachment=this.attachment(socket);if(attachment?.role==="host"&&attachment.connectionId===oldHost)socket.close(1001,"heartbeat timeout");}}this.clean(room,now);await this.put(room);this.broadcast(this.stateMessage(room,now));}
 }
