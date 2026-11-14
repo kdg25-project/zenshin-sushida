@@ -63,6 +63,7 @@ describe("RankingScene", () => {
   it("extends the empty-state body mask past the old row outline at its left edge", () => {
     const css = readFileSync(new URL("./menu-ranking.css", import.meta.url), "utf8");
 
+    expect(css).toContain('ranking-stage-textless.png?v=20261114');
     expect(css).toMatch(/\.source-ranking__body-mask\{[^}]*left:calc\(5\.95% - 2px\)/);
     expect(css).toMatch(/\.source-ranking__podium-mask\{[^}]*top:11\.5%/);
     expect(css).toContain(".source-ranking__page[data-current]::after{background:#ae211b");

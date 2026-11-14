@@ -21,7 +21,10 @@
 .source-scene--menu[data-portrait] .source-menu__error{left:55px;top:337px;width:430px;font-size:14px}
 
 .source-scene--ranking{background:#5a2106}
-.source-ranking__backdrop{position:absolute;inset:0;background:url("/assets/illustrator-v3/ranking-stage-textless.png") center/100% 100% no-repeat;image-rendering:pixelated}
+/* The stage includes the ten row frames. Version the URL because an earlier
+ * export had its frames lower on the artboard, while the live row overlay uses
+ * this export's measured positions. */
+.source-ranking__backdrop{position:absolute;inset:0;background:url("/assets/illustrator-v3/ranking-stage-textless.png?v=20261114") center/100% 100% no-repeat;image-rendering:pixelated}
 .source-ranking__title{position:absolute;z-index:2;left:28.125%;top:0;width:43.75%;height:21.3%;object-fit:fill;image-rendering:pixelated}
 .source-ranking__board{position:absolute;z-index:1;left:11.25%;top:16.9%;width:77.9%;height:72.75%}
 .source-ranking__heading{position:absolute;z-index:3;left:0;right:0;top:5.5%;height:8%;font-size:22px;font-weight:800;color:#120d09}
