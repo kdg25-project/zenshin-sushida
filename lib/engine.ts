@@ -7,7 +7,7 @@ export type MatcherResult = { valid: boolean; accuracy: number; jointScore: numb
 /** A valid camera pose may still be too similar to another ROMAJI silhouette to solve. */
 export type GuardedMatcherResult = MatcherResult & { accepted: boolean; nearestTemplateId?: string; margin?: number };
 export type GameConfig = { durationMs: number; threshold: number; holdMs: number; scoreVersion: string; rulesVersion: string; templateVersion: string; wordVersion: string; maxFrameGapMs: number };
-export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v10", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v8", maxFrameGapMs: 180 };
+export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v11", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v8", maxFrameGapMs: 180 };
 
 const finite = (p: Point | undefined): p is Point => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -98,6 +98,8 @@ function hasEOutwardRightForearm(actual: NormalizedPose) {
 /** B closes below the shoulder; a raised P hand must not become B after arm relaxation. */
 function hasBLoweredRightHand(actual: NormalizedPose) { return actual.rightWrist.y-actual.rightShoulder.y>=.55; }
 function hasBSignature(actual: NormalizedPose) { return hasBLoweredRightHand(actual)&&actual.rightWrist.x-actual.rightShoulder.x<=.45; }
+/** B bends from an elbow at chest height; D keeps the elbow lower beside the waist. */
+function hasBChestHand(actual: NormalizedPose) { return hasBSignature(actual)&&actual.rightElbow.y-actual.rightShoulder.y<=.2; }
 function hasPHeadHand(actual: NormalizedPose) { return actual.rightWrist.y-actual.rightShoulder.y<=-.15&&actual.rightElbow.x-actual.rightShoulder.x>=.65; }
 function hasFSignature(actual: NormalizedPose) { return actual.leftWrist.y-actual.leftShoulder.y>=.55&&Math.abs(actual.rightElbow.y-actual.rightShoulder.y)<=.45&&Math.abs(actual.rightWrist.x-actual.rightElbow.x)<=.45&&actual.rightWrist.y-actual.rightShoulder.y<=-.6&&Math.abs(actual.leftAnkle.x-actual.leftHip.x)<=.35&&Math.abs(actual.rightAnkle.x-actual.rightHip.x)<=.35; }
 /** W keeps both elbows below the shoulders while both forearms rise outward. */
@@ -106,20 +108,52 @@ function hasWOutwardForearms(actual: NormalizedPose) {
 }
 /** K keeps its left arm lowered while its right hand and foot both point outward. */
 function hasKSignature(actual: NormalizedPose) { return actual.leftWrist.y-actual.leftShoulder.y>=.55&&actual.rightElbow.x-actual.rightShoulder.x>=.45&&actual.rightWrist.y-actual.rightShoulder.y<=-.45&&actual.rightAnkle.x-actual.rightHip.x>=.45; }
+/** I is two nearly vertical, downward arms; a rotated one-sided silhouette must not become I. */
+function hasIVerticalDownArms(actual: NormalizedPose) {
+  const leftForearm=limbDirection(actual.leftElbow,actual.leftWrist),rightForearm=limbDirection(actual.rightElbow,actual.rightWrist);
+  return actual.leftWrist.y-actual.leftShoulder.y>=.8&&actual.rightWrist.y-actual.rightShoulder.y>=.8&&Math.abs(actual.leftWrist.x-actual.leftShoulder.x)<=.31&&Math.abs(actual.rightWrist.x-actual.rightShoulder.x)<=.31&&Math.abs(actual.leftAnkle.x-actual.leftHip.x)<=.5&&Math.abs(actual.rightAnkle.x-actual.rightHip.x)<=.5&&actual.leftElbow.x-actual.leftShoulder.x<=.35&&actual.rightElbow.x-actual.rightShoulder.x>=-.35&&leftForearm.y>=.5&&rightForearm.y>=.5&&Math.abs(leftForearm.x)<=.55&&Math.abs(rightForearm.x)<=.55;
+}
+/** D's right hand rests at the waist while its elbow points out; B instead closes at the chest. */
+function hasDWaistHand(actual: NormalizedPose) {
+  const rightForearm=limbDirection(actual.rightElbow,actual.rightWrist);
+  return actual.leftWrist.y-actual.leftShoulder.y>=.55&&actual.rightElbow.x-actual.rightShoulder.x>=.45&&actual.rightElbow.y-actual.rightShoulder.y>=.05&&actual.rightWrist.x-actual.rightHip.x>=-.1&&actual.rightWrist.x-actual.rightHip.x<=.42&&actual.rightWrist.y-actual.rightHip.y>=-.2&&actual.rightWrist.y-actual.rightHip.y<=.5&&rightForearm.x<=-.25&&rightForearm.y>=.35;
+}
+/** A is an overhead triangle. Straight or inward elbows remain valid so legs never carry its identity. */
+function hasAOverheadTriangle(actual: NormalizedPose) {
+  const leftForearm=limbDirection(actual.leftElbow,actual.leftWrist),rightForearm=limbDirection(actual.rightElbow,actual.rightWrist);
+  return actual.leftWrist.y-actual.leftShoulder.y<=-.6&&actual.rightWrist.y-actual.rightShoulder.y<=-.6&&Math.abs(actual.leftWrist.x-actual.rightWrist.x)<=.7&&actual.leftElbow.x-actual.leftShoulder.x>=-.62&&actual.rightElbow.x-actual.rightShoulder.x<=.62&&leftForearm.x>=.16&&leftForearm.y<=-.1&&rightForearm.x<=-.16&&rightForearm.y<=-.1;
+}
+/** O keeps the same overhead hands but opens both elbows outward into its rounded sides. */
+function hasOWideRoundArms(actual: NormalizedPose) {
+  const leftForearm=limbDirection(actual.leftElbow,actual.leftWrist),rightForearm=limbDirection(actual.rightElbow,actual.rightWrist);
+  return actual.leftWrist.y-actual.leftShoulder.y<=-.85&&actual.rightWrist.y-actual.rightShoulder.y<=-.85&&Math.abs(actual.leftWrist.x-actual.rightWrist.x)<=.7&&actual.leftElbow.x-actual.leftShoulder.x<=-.44&&actual.rightElbow.x-actual.rightShoulder.x>=.44&&leftForearm.x>=.16&&leftForearm.y<=-.12&&rightForearm.x<=-.16&&rightForearm.y<=-.12;
+}
+/** S rises inward on the left and folds inward/down on the right, unlike G's outward right hook. */
+function hasSAsymmetricForearms(actual: NormalizedPose) {
+  return actual.leftElbow.y-actual.leftShoulder.y>=.15&&actual.rightElbow.y-actual.rightShoulder.y>=.15&&actual.leftWrist.y<=actual.leftElbow.y-.2&&actual.rightWrist.y>=actual.rightElbow.y+.2&&actual.leftWrist.x-actual.leftElbow.x>=.22&&actual.rightElbow.x-actual.rightWrist.x>=.22;
+}
+/** Only a clearly narrow A may ignore O's score; intermediate arm widths remain ambiguous. */
+function hasDistinctAOverheadTriangle(actual: NormalizedPose) {
+  return hasAOverheadTriangle(actual)&&actual.leftElbow.x-actual.leftShoulder.x>=-.35&&actual.rightElbow.x-actual.rightShoulder.x<=.35;
+}
 function rivalIsEligible(actual: NormalizedPose, targetId: string, rivalId: string) {
   if(targetId==="M"&&rivalId==="H"&&hasMFoldedForearms(actual)) return hasHForearms(actual);
   if(targetId==="E"&&rivalId==="R"&&hasEOutwardRightForearm(actual)) return hasRSignature(actual);
   if(targetId==="E"&&rivalId==="F"&&hasEOutwardRightForearm(actual)) return false;
+  if(targetId==="E"&&rivalId==="D"&&hasEOutwardRightForearm(actual)) return false;
   if(targetId==="B"&&rivalId==="D"&&hasBSignature(actual)) return false;
   if(targetId==="P"&&rivalId==="B"&&hasPHeadHand(actual)) return false;
   if(targetId==="F"&&rivalId==="K"&&hasFSignature(actual)) return false;
   if(targetId==="F"&&rivalId==="P"&&hasFSignature(actual)) return false;
   if(targetId==="K"&&(rivalId==="F"||rivalId==="Z")&&hasKSignature(actual)) return false;
   if(targetId==="W"&&["H","S","T","U"].includes(rivalId)&&hasWOutwardForearms(actual)) return false;
+  if(targetId==="A"&&rivalId==="O"&&hasDistinctAOverheadTriangle(actual)) return false;
+  if(targetId==="O"&&rivalId==="A"&&hasOWideRoundArms(actual)) return false;
+  if(targetId==="S"&&rivalId==="G"&&hasSAsymmetricForearms(actual)) return false;
   return true;
 }
 function targetHasRequiredSignature(actual: NormalizedPose, targetId: string) {
-  return (targetId!=="H"||hasHForearms(actual))&&(targetId!=="R"||hasRSignature(actual))&&(targetId!=="B"||hasBLoweredRightHand(actual))&&(targetId!=="K"||hasKSignature(actual));
+  return (targetId!=="H"||hasHForearms(actual))&&(targetId!=="R"||hasRSignature(actual))&&(targetId!=="B"||hasBChestHand(actual))&&(targetId!=="I"||hasIVerticalDownArms(actual))&&(targetId!=="K"||hasKSignature(actual))&&(targetId!=="D"||hasDWaistHand(actual))&&(targetId!=="A"||hasAOverheadTriangle(actual))&&(targetId!=="O"||hasOWideRoundArms(actual))&&(targetId!=="S"||hasSAsymmetricForearms(actual));
 }
 
 /**

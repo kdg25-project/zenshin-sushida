@@ -79,8 +79,8 @@ describe("GameScene", () => {
     expect(markup(0)).toContain('<strong>0</strong>');
     expect(markup(.49)).toContain('data-tone="low"');
     expect(markup(.5)).toContain('data-tone="okay"');
-    expect(markup(.71)).toContain('data-tone="okay"');
-    expect(markup(.72)).toContain('data-tone="good"');
+    expect(markup(.67)).toContain('data-tone="okay"');
+    expect(markup(.68)).toContain('data-tone="good"');
     expect(markup(1)).toContain('<strong>100</strong>');
     expect(markup(1)).toContain('data-tone="good"');
     expect(markup(Number.NaN)).toContain('data-tone="unavailable"');

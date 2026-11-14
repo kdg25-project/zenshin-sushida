@@ -46,7 +46,7 @@ describe("D1 ranking API", () => {
       round=solveCurrentLetterManually(round,startedAt+3_900);
       round=solveCurrentLetterManually(round,startedAt+4_300);
       expect(round.events).toHaveLength(2);
-      expect(round.events.every(item=>item.kind==="solve"&&item.accuracy===.72)).toBe(true);
+      expect(round.events.every(item=>item.kind==="solve"&&item.accuracy===.68)).toBe(true);
       const response=await post(mf,`/api/games/${game.id}/submit`,createRankingSubmission("staff",round,RULES_KEY),game.token);
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({solved:2,maxCombo:2});
@@ -63,7 +63,7 @@ describe("D1 ranking API", () => {
       expect((await post(mf, "/api/games", { rulesKey: "rules-v1|score-v1|poses-v1|60000|0.86|400", simulation: false })).status).toBe(422);
       const game = await (await post(mf, "/api/games", { rulesKey: RULES_KEY, simulation: false })).json() as StartedGame;
       const word=sushiWord(wordSequence(game.seed)[0])!;
-      expect((await post(mf, `/api/games/${game.id}/submit`, {name:"low",rulesKey:RULES_KEY,simulation:false,events:[{...event(game.seed,0,0,400),accuracy:.71}]},game.token)).status).toBe(422);
+      expect((await post(mf, `/api/games/${game.id}/submit`, {name:"low",rulesKey:RULES_KEY,simulation:false,events:[{...event(game.seed,0,0,400),accuracy:.67}]},game.token)).status).toBe(422);
       const forged={...event(game.seed,0,0,400),wordId:word.id==="saba"?"ebi":"saba"};
       expect((await post(mf, `/api/games/${game.id}/submit`, {name:"bad",rulesKey:RULES_KEY,simulation:false,events:[forged]},game.token)).status).toBe(422);
       const early={...event(game.seed,0,0,399)};

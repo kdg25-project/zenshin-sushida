@@ -31,10 +31,10 @@ const paths: JointName[][] = [["leftShoulder", "leftElbow", "leftWrist"], ["righ
 // reproduce every stroke of a font. The arm/leg lines carry the recognisable parts
 // of each capital while both feet remain grounded.
 export const POSE_TEMPLATES: PoseTemplate[] = [
-  ["A", "A", "両手を頭の少し上で近づけ、ひじを自然に曲げて足を広げる", { leftElbow:{x:-.8,y:-1.6},rightElbow:{x:.8,y:-1.6},leftWrist:{x:-.18,y:-2.15},rightWrist:{x:.18,y:-2.15},leftKnee:{x:-.92,y:1.08},rightKnee:{x:.92,y:1.08},leftAnkle:{x:-1.35,y:2.08},rightAnkle:{x:1.35,y:2.08} }],
+  ["A", "A", "両手を頭の少し上で近づけ、ひじを内側にした三角を作る。足は肩幅でよい", { leftElbow:{x:-.65,y:-1.65},rightElbow:{x:.65,y:-1.65},leftWrist:{x:-.14,y:-2.22},rightWrist:{x:.14,y:-2.22},leftKnee:{x:-.48,y:1.16},rightKnee:{x:.48,y:1.16},leftAnkle:{x:-.62,y:2.22},rightAnkle:{x:.62,y:2.22} }],
   ["B", "B", "左腕を体側の縦線にし、右ひじを張って胸の前へ曲げる", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.3,y:-1.18},rightWrist:{x:.28,y:-.24} }],
   ["C", "C", "左ひじを頭の上へ上げて手を右へ伸ばし、右腕を横へ開いて、右側が開いたCの輪郭を作る", { leftElbow:{x:-.8,y:-1.85},leftWrist:{x:.25,y:-2.1},rightElbow:{x:.65,y:-.1},rightWrist:{x:1.55,y:-.1},leftKnee:{x:-.38,y:1.18},rightKnee:{x:.38,y:1.18},leftAnkle:{x:-.45,y:2.25},rightAnkle:{x:.45,y:2.25} }],
-  ["D", "D", "左腕を体側へ下ろし、右ひじを斜め上へ出して、手をわき腹の高さへ下ろす", { leftElbow:{x:-.83,y:.06},leftWrist:{x:-.83,y:1.2},rightElbow:{x:1.5,y:-1.5},rightWrist:{x:1.5,y:-.2} }],
+  ["D", "D", "左腕を体側へ下ろし、右手を腰に当てて、右ひじを外へ開く", { leftElbow:{x:-.83,y:.06},leftWrist:{x:-.83,y:1.2},rightElbow:{x:1.2,y:-.5},rightWrist:{x:.6,y:.25} }],
   ["E", "E", "左腕を体側の縦線にし、右腕を肩の高さで横へ伸ばす", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.28,y:-1},rightWrist:{x:2.08,y:-1} }],
   ["F", "F", "左腕を体側へ下ろし、右腕を肩の高さで横へ伸ばして、前腕をまっすぐ上へ立てる", { leftElbow:{x:-.83,y:.06},leftWrist:{x:-.83,y:1.2},rightElbow:{x:1.71,y:-1},rightWrist:{x:1.71,y:-2.21} }],
   ["G", "G", "左腕を低めの上フックにし、右腕を外へ開いて、足をそろえる", { leftElbow:{x:-.9,y:-1.35},leftWrist:{x:-.55,y:-1.8},rightElbow:{x:1.3,y:-.7},rightWrist:{x:1.85,y:-.48},leftKnee:{x:-.2,y:1.16},rightKnee:{x:.2,y:1.16},leftAnkle:{x:-.1,y:2.2},rightAnkle:{x:.1,y:2.2} }],
