@@ -7,7 +7,8 @@ type FetchLike = (input:RequestInfo|URL, init?:RequestInit)=>Promise<Response>;
  * contract used by remote staff controls. A failed request never becomes done. */
 export async function submitBoothRankingAction(input:{ fetcher:FetchLike; url:string; token:string; payload:unknown; isCurrent:()=>boolean }):Promise<BoothRankingOutcome> {
   try {
-    const response=await input.fetcher(input.url,{method:"POST",headers:{"content-type":"application/json","x-game-token":input.token},body:JSON.stringify(input.payload)});
+    const {fetcher}=input;
+    const response=await fetcher(input.url,{method:"POST",headers:{"content-type":"application/json","x-game-token":input.token},body:JSON.stringify(input.payload)});
     const data=await response.json().catch(()=>undefined);
     if(!input.isCurrent())return {ok:false,code:"CANCELLED",message:"登録操作が取り消されました",clearSession:false,refreshRanks:false};
     const outcome=classifyRankingSubmitResponse(response.ok,data);

@@ -3,6 +3,12 @@ import { submitBoothRankingAction } from "./booth-ranking-action";
 
 const run=(response:Response|Error,current=true)=>submitBoothRankingAction({fetcher:async()=>{if(response instanceof Error)throw response;return response;},url:"/submit",token:"token",payload:{},isCurrent:()=>current});
 describe("booth ranking acknowledgement",()=>{
+  it("calls a native browser fetch without binding the action input as this",async()=>{
+    let receiver:unknown="not-called";
+    const fetcher=function(this:unknown,_input:RequestInfo|URL,_init?:RequestInit){receiver=this;return Promise.resolve(new Response(JSON.stringify({score:1,solved:1,maxCombo:1,averageAccuracy:.8}),{headers:{"content-type":"application/json"}}));};
+    await submitBoothRankingAction({fetcher,url:"/submit",token:"token",payload:{},isCurrent:()=>true});
+    expect(receiver).toBeUndefined();
+  });
   it("does not acknowledge a server failure and keeps the result retryable",async()=>expect(await run(new Response("broken",{status:500}))).toMatchObject({ok:false,code:"SUBMIT_FAILED",clearSession:false}));
   it("does not acknowledge a network failure and keeps the result retryable",async()=>expect(await run(new Error("offline"))).toMatchObject({ok:false,code:"SUBMIT_FAILED",clearSession:false}));
   it("does not acknowledge a malformed success receipt",async()=>expect(await run(new Response(JSON.stringify({score:"bad"}),{status:200,headers:{"content-type":"application/json"}}))).toMatchObject({ok:false,code:"SUBMIT_FAILED",clearSession:false}));
