@@ -32,7 +32,7 @@ const paths: JointName[][] = [["leftShoulder", "leftElbow", "leftWrist"], ["righ
 // of each capital while both feet remain grounded.
 export const POSE_TEMPLATES: PoseTemplate[] = [
   ["A", "A", "両手を頭の少し上で近づけ、ひじを内側にした三角を作る。足は肩幅でよい", { leftElbow:{x:-.65,y:-1.65},rightElbow:{x:.65,y:-1.65},leftWrist:{x:-.14,y:-2.22},rightWrist:{x:.14,y:-2.22},leftKnee:{x:-.48,y:1.16},rightKnee:{x:.48,y:1.16},leftAnkle:{x:-.62,y:2.22},rightAnkle:{x:.62,y:2.22} }],
-  ["B", "B", "左腕を体側の縦線にし、右ひじを張って胸の前へ曲げる", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.3,y:-1.18},rightWrist:{x:.28,y:-.24} }],
+  ["B", "B", "左腕を体側へ下ろし、右ひじを低く外へ出して、前腕だけを外側で上げる", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.15,y:-.2},rightWrist:{x:1.4,y:-1} }],
   ["C", "C", "左ひじを頭の上へ上げて手を右へ伸ばし、右腕を横へ開いて、右側が開いたCの輪郭を作る", { leftElbow:{x:-.8,y:-1.85},leftWrist:{x:.25,y:-2.1},rightElbow:{x:.65,y:-.1},rightWrist:{x:1.55,y:-.1},leftKnee:{x:-.38,y:1.18},rightKnee:{x:.38,y:1.18},leftAnkle:{x:-.45,y:2.25},rightAnkle:{x:.45,y:2.25} }],
   ["D", "D", "左腕を体側へ下ろし、右手を腰に当てて、右ひじを外へ開く", { leftElbow:{x:-.83,y:.06},leftWrist:{x:-.83,y:1.2},rightElbow:{x:1.2,y:-.5},rightWrist:{x:.6,y:.25} }],
   ["E", "E", "左腕を体側の縦線にし、右腕を肩の高さで横へ伸ばす", { leftElbow:{x:-.78,y:-.1},leftWrist:{x:-.78,y:.92},rightElbow:{x:1.28,y:-1},rightWrist:{x:2.08,y:-1} }],
