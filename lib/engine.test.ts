@@ -58,8 +58,8 @@ function noisyPose(source: NormalizedPose, seed: number): NormalizedPose {
 describe("pose matcher",()=>{
  it("recognizes every exact provisional pose despite a wide source aspect",()=>{for(const pose of POSE_TEMPLATES){const score=matchPose(syntheticLandmarks(pose,16/9),16/9,pose);expect(score.valid).toBe(true);expect(score.accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);}});
  it("uses exactly the canonical ROMAJI letters and rejects an obviously different pose",()=>{expect(POSE_TEMPLATES.map(pose=>pose.id)).toEqual([...ROMAJI_ALPHABET]);const upright=POSE_TEMPLATES.find(x=>x.id==="M")!, handsDown=POSE_TEMPLATES.find(x=>x.id==="I")!;expect(matchPose(syntheticLandmarks(handsDown),16/9,upright).accuracy).toBeLessThan(DEFAULT_CONFIG.threshold);});
- it("uses the current pose template version and guarded rules in gameplay and leaderboard isolation",()=>{expect(POSE_TEMPLATE_VERSION).toBe("poses-v12");expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(DEFAULT_CONFIG.rulesVersion).toBe("rules-v12");expect(DEFAULT_CONFIG.threshold).toBe(.68);expect(A_POSE_MATCH_MARGIN).toBe(.01);expect(O_POSE_MATCH_MARGIN).toBe(.015);expect(G_POSE_MATCH_MARGIN).toBe(.02);expect(S_POSE_MATCH_MARGIN).toBe(.02);expect(RULES_KEY).toBe(`rules-v12|score-v1|words-v8|${POSE_TEMPLATE_VERSION}|60000|0.68|400|a0.01|o0.015|g0.02|s0.02`);});
- it("keeps C/M/S open, uncrossed silhouettes and the open-right-arm G template",()=>{const c=POSE_TEMPLATES.find(template=>template.id==="C")!,m=POSE_TEMPLATES.find(template=>template.id==="M")!,s=POSE_TEMPLATES.find(template=>template.id==="S")!,g=POSE_TEMPLATES.find(template=>template.id==="G")!;expect(c.pose).toMatchObject({leftElbow:{x:-.8,y:-1.85},leftWrist:{x:.25,y:-2.1},rightElbow:{x:.65,y:-.1},rightWrist:{x:1.55,y:-.1}});expect(c.pose.leftWrist.x).toBeGreaterThan(c.pose.leftElbow.x);expect(c.pose.rightWrist.x).toBeGreaterThan(c.pose.rightElbow.x);expect(m.pose).toMatchObject({leftElbow:{x:-1.2,y:-.5},leftWrist:{x:-.35,y:.4},rightElbow:{x:1.2,y:-.5},rightWrist:{x:.35,y:.4}});expect(m.pose.leftElbow.y).toBeGreaterThan(m.pose.leftShoulder.y);expect(distance(m.pose.leftWrist,m.pose.rightWrist)).toBeGreaterThan(.64);expect(s.pose).toMatchObject({leftElbow:{x:-1.2,y:-.55},leftWrist:{x:-.55,y:-1.5},rightElbow:{x:1.1,y:-.2},rightWrist:{x:.45,y:.4}});expect(s.pose.leftElbow.y).toBeGreaterThan(s.pose.leftShoulder.y);expect(s.pose.rightElbow.y).toBeGreaterThan(s.pose.rightShoulder.y);expect(s.pose.leftWrist.x).toBeLessThan(s.pose.leftShoulder.x);expect(s.pose.rightWrist.x).toBeGreaterThan(s.pose.rightHip.x);expect(g.pose).toMatchObject({leftElbow:{x:-.9,y:-1.35},leftWrist:{x:-.55,y:-1.8},rightElbow:{x:1.3,y:-.7},rightWrist:{x:1.85,y:-.48}});});
+ it("uses the current pose template version and guarded rules in gameplay and leaderboard isolation",()=>{expect(POSE_TEMPLATE_VERSION).toBe("poses-v13");expect(DEFAULT_CONFIG.templateVersion).toBe(POSE_TEMPLATE_VERSION);expect(DEFAULT_CONFIG.rulesVersion).toBe("rules-v13");expect(DEFAULT_CONFIG.threshold).toBe(.68);expect(A_POSE_MATCH_MARGIN).toBe(.01);expect(O_POSE_MATCH_MARGIN).toBe(.015);expect(G_POSE_MATCH_MARGIN).toBe(.02);expect(S_POSE_MATCH_MARGIN).toBe(.02);expect(RULES_KEY).toBe(`rules-v13|score-v1|words-v8|${POSE_TEMPLATE_VERSION}|60000|0.68|400|a0.01|o0.015|g0.02|s0.02`);});
+ it("keeps C/M/S open, uncrossed silhouettes and the open-right-arm G template",()=>{const c=POSE_TEMPLATES.find(template=>template.id==="C")!,m=POSE_TEMPLATES.find(template=>template.id==="M")!,s=POSE_TEMPLATES.find(template=>template.id==="S")!,g=POSE_TEMPLATES.find(template=>template.id==="G")!;expect(c.pose).toMatchObject({leftElbow:{x:-.8,y:-1.85},leftWrist:{x:.25,y:-2.1},rightElbow:{x:.65,y:-.1},rightWrist:{x:1.55,y:-.1}});expect(c.pose.leftWrist.x).toBeGreaterThan(c.pose.leftElbow.x);expect(c.pose.rightWrist.x).toBeGreaterThan(c.pose.rightElbow.x);expect(m.pose).toMatchObject({leftElbow:{x:-1.2,y:-.5},leftWrist:{x:-.35,y:.4},rightElbow:{x:1.2,y:-.5},rightWrist:{x:.35,y:.4}});expect(m.pose.leftElbow.y).toBeGreaterThan(m.pose.leftShoulder.y);expect(distance(m.pose.leftWrist,m.pose.rightWrist)).toBeGreaterThan(.64);expect(s.pose).toMatchObject({leftElbow:{x:-1.2,y:-.55},leftWrist:{x:-.55,y:-1.5},rightElbow:{x:.9,y:0},rightWrist:{x:.4,y:.45}});expect(s.pose.leftElbow.y).toBeGreaterThan(s.pose.leftShoulder.y);expect(s.pose.rightElbow.y).toBeGreaterThan(s.pose.rightShoulder.y);expect(s.pose.leftWrist.x).toBeLessThan(s.pose.leftShoulder.x);expect(s.pose.rightWrist.x).toBeGreaterThan(s.pose.rightHip.x);expect(g.pose).toMatchObject({leftElbow:{x:-.9,y:-1.35},leftWrist:{x:-.55,y:-1.8},rightElbow:{x:1.3,y:-.7},rightWrist:{x:1.85,y:-.48}});});
  it("keeps every limb in a plausible standing range and preserves key letter silhouettes",()=>{
   for(const template of POSE_TEMPLATES) for(const [start,end] of [["leftShoulder","leftElbow"],["leftElbow","leftWrist"],["rightShoulder","rightElbow"],["rightElbow","rightWrist"],["leftHip","leftKnee"],["leftKnee","leftAnkle"],["rightHip","rightKnee"],["rightKnee","rightAnkle"]] as const) { const length=distance(template.pose[start],template.pose[end]);expect(length,`${template.id}:${start}-${end}`).toBeGreaterThan(.5);expect(length,`${template.id}:${start}-${end}`).toBeLessThan(1.5); }
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
@@ -83,12 +83,12 @@ describe("pose matcher",()=>{
   expect(y.leftWrist.y).toBeLessThan(y.leftElbow.y);expect(distance(y.leftWrist,y.rightWrist)).toBeGreaterThan(3);
   expect(z.leftWrist.y).toBeCloseTo(z.leftShoulder.y);expect(z.rightWrist.y).toBeGreaterThan(z.rightElbow.y);expect(Math.abs(z.leftAnkle.x-z.rightAnkle.x)).toBeGreaterThan(2);
  });
- it("requires the target to be clearer than every other adopted character",()=>{for(const actual of POSE_TEMPLATES)for(const target of POSE_TEMPLATES)if(actual.id!==target.id){const normalized=normalizeLandmarks(syntheticLandmarks(actual,16/9),16/9).pose!;expect(matchTargetPose(normalized,target,DEFAULT_CONFIG.threshold).accepted,`${actual.character} must not solve ${target.character}`).toBe(false);}});
+ it("keeps canonical letters distinct outside the user-authorized A/O near-shape overlap",()=>{for(const actual of POSE_TEMPLATES)for(const target of POSE_TEMPLATES)if(actual.id!==target.id){const isAuthorizedOverheadOverlap=[actual.id,target.id].every(id=>id==="A"||id==="O");if(isAuthorizedOverheadOverlap)continue;const normalized=normalizeLandmarks(syntheticLandmarks(actual,16/9),16/9).pose!;expect(matchTargetPose(normalized,target,DEFAULT_CONFIG.threshold).accepted,`${actual.character} must not solve ${target.character}`).toBe(false);}});
  it("accepts exact raw frames and the measured 10°/20° natural-bend subsets without accepting a deformed wrong letter",()=>{
   for(const template of POSE_TEMPLATES){const normalized=normalizeLandmarks(rawFromNormalized(template.pose),16/9).pose!;expect(matchTargetPose(normalized,template,DEFAULT_CONFIG.threshold).accepted,template.id).toBe(true);}
   const accepted10=POSE_TEMPLATES.filter(template=>matchTargetPose(normalizedBent(template,10),template,DEFAULT_CONFIG.threshold).accepted),accepted20=POSE_TEMPLATES.filter(template=>matchTargetPose(normalizedBent(template,20),template,DEFAULT_CONFIG.threshold).accepted);
   expect(accepted10).toHaveLength(POSE_TEMPLATES.length);expect(accepted20.map(template=>template.id)).toEqual(POSE_TEMPLATES.map(template=>template.id).filter(id=>!["B","D","O"].includes(id)));
-  for(const actual of POSE_TEMPLATES){const normalized=normalizedBent(actual,20);for(const target of POSE_TEMPLATES)if(target.id!==actual.id)expect(matchTargetPose(normalized,target,DEFAULT_CONFIG.threshold).accepted,`${actual.id} must not solve ${target.id}`).toBe(false);}
+  for(const actual of POSE_TEMPLATES){const normalized=normalizedBent(actual,20);for(const target of POSE_TEMPLATES)if(target.id!==actual.id){if([actual.id,target.id].every(id=>id==="A"||id==="O"))continue;expect(matchTargetPose(normalized,target,DEFAULT_CONFIG.threshold).accepted,`${actual.id} must not solve ${target.id}`).toBe(false);}}
  });
  it("keeps the approved F/P/K forms distinct through realistic bends",()=>{
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
@@ -123,8 +123,11 @@ describe("pose matcher",()=>{
    ["S",{...byId("S").pose,leftElbow:{x:-1.1,y:-.45},leftWrist:{x:-.45,y:-1.35},rightElbow:{x:1,y:-.1},rightWrist:{x:.55,y:.48}}],
   ];
   for(const [id,variant] of variants){const normalized=normalizeLandmarks(rawFromNormalized(variant),16/9).pose!,target=byId(id);expect(matchTargetPose(normalized,target).accepted,`${id} relaxed arms`).toBe(true);for(const other of POSE_TEMPLATES)if(other.id!==id)expect(matchTargetPose(normalized,other).accepted,`${id} relaxed arms must not solve ${other.id}`).toBe(false);}
+  const comfortableM={...byId("M").pose,leftElbow:{x:-.8,y:-1.02},rightElbow:{x:.8,y:-1.02},leftWrist:{x:-.32,y:0},rightWrist:{x:.32,y:0},leftKnee:{x:-.35,y:1.14},rightKnee:{x:.35,y:1.14},leftAnkle:{x:-.48,y:2.2},rightAnkle:{x:.48,y:2.2}};
+  const comfortableMActual=normalizeLandmarks(rawFromNormalized(comfortableM),16/9).pose!;
+  expect(matchTargetPose(comfortableMActual,byId("M"))).toMatchObject({valid:true,accepted:true});
  });
- it("does not let incompatible H/R signatures block folded M or outward E, while retaining H/R directionality",()=>{
+ it("allows comfortable M folds to overlap H while retaining exact H and R directionality",()=>{
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
   const blend=(from: NormalizedPose,to: NormalizedPose,amount:number)=>Object.fromEntries(REQUIRED_JOINTS.map(name=>[name,{x:from[name].x*(1-amount)+to[name].x*amount,y:from[name].y*(1-amount)+to[name].y*amount}])) as NormalizedPose;
   const foldedM=normalizeLandmarks(rawFromNormalized(blend(byId("M").pose,byId("H").pose,.5)),16/9).pose!;
@@ -132,7 +135,7 @@ describe("pose matcher",()=>{
   const slightInwardH=normalizeLandmarks(rawFromNormalized({...byId("H").pose,leftWrist:{x:-1.08,y:-.1},rightWrist:{x:1.08,y:-.1}}),16/9).pose!;
   expect(matchTargetPose(slightInwardH,byId("H")).accepted).toBe(true);expect(matchTargetPose(slightInwardH,byId("M")).accepted).toBe(false);
   const h=byId("H"),inwardH20=normalizeLandmarks(rawFromNormalized({...h.pose,leftWrist:add(h.pose.leftElbow,rotate(sub(h.pose.leftWrist,h.pose.leftElbow),-20)),rightWrist:add(h.pose.rightElbow,rotate(sub(h.pose.rightWrist,h.pose.rightElbow),20))}),16/9).pose!;
-  expect(matchTargetPose(inwardH20,h).accepted).toBe(true);expect(matchTargetPose(inwardH20,byId("M")).accepted).toBe(false);
+  expect(matchTargetPose(inwardH20,h).accepted).toBe(true);expect(matchTargetPose(inwardH20,byId("M")).accepted).toBe(true);
   const outwardE=normalizeLandmarks(rawFromNormalized({...byId("E").pose,rightWrist:{x:1.9,y:-.9}}),16/9).pose!;
   expect(matchTargetPose(outwardE,byId("E")).accepted).toBe(true);expect(matchTargetPose(outwardE,byId("R")).accepted).toBe(false);
   const relaxedR=normalizeLandmarks(rawFromNormalized({...byId("R").pose,rightElbow:{x:1.1,y:-1.1},rightWrist:{x:.35,y:-.75},rightKnee:{x:1.05,y:.98},rightAnkle:{x:1.65,y:1.98}}),16/9).pose!;
@@ -170,10 +173,11 @@ describe("pose matcher",()=>{
   const relaxedS=matchTargetPose(noisyPose(naturallyBent(s.pose,15),7),s);
   expect(relaxedS).toMatchObject({valid:true,accepted:true});expect(relaxedS.accuracy).toBeGreaterThanOrEqual(DEFAULT_CONFIG.threshold);expect(relaxedS.margin).toBeGreaterThanOrEqual(S_POSE_MATCH_MARGIN);
  });
- it("rejects every wrong template through 30° bends and five deterministic body-noise variants",()=>{
+ it("rejects every wrong template through 30° bends and five deterministic body-noise variants outside the authorized A/O overlap",()=>{
   for(const actual of POSE_TEMPLATES)for(const target of POSE_TEMPLATES)if(actual.id!==target.id){
-   for(const degrees of [0,10,20,30]){const pose=degrees?normalizedBent(actual,degrees):normalizeLandmarks(rawFromNormalized(actual.pose),16/9).pose!;if(actual.id==="D"&&target.id==="I"&&degrees===30){/* This synthetic bend displaces D's waist hand, so verify it cannot still solve D. */expect(matchTargetPose(pose,actual).accepted).toBe(false);continue;}expect(matchTargetPose(pose,target).accepted,`${actual.id}/${degrees}° must not solve ${target.id}`).toBe(false);}
-   for(const degrees of [20,30])for(let seed=1;seed<=5;seed++){const pose=noisyPose(naturallyBent(actual.pose,degrees),seed);if(actual.id==="D"&&target.id==="I"&&degrees===30){/* The same fixture no longer represents a hand-on-waist D. */expect(matchTargetPose(pose,actual).accepted).toBe(false);continue;}expect(matchTargetPose(pose,target).accepted,`${actual.id}/${degrees}°/seed${seed} must not solve ${target.id}`).toBe(false);}
+   const isAuthorizedOverheadOverlap=[actual.id,target.id].every(id=>id==="A"||id==="O");
+   for(const degrees of [0,10,20,30]){const pose=degrees?normalizedBent(actual,degrees):normalizeLandmarks(rawFromNormalized(actual.pose),16/9).pose!;if(isAuthorizedOverheadOverlap)continue; if(actual.id==="D"&&target.id==="I"&&degrees===30){/* This synthetic bend displaces D's waist hand, so verify it cannot still solve D. */expect(matchTargetPose(pose,actual).accepted).toBe(false);continue;}expect(matchTargetPose(pose,target).accepted,`${actual.id}/${degrees}° must not solve ${target.id}`).toBe(false);}
+   for(const degrees of [20,30])for(let seed=1;seed<=5;seed++){const pose=noisyPose(naturallyBent(actual.pose,degrees),seed),isBeyondNaturalOverheadTurn=actual.id==="U"&&target.id==="O"&&degrees===30;if(isAuthorizedOverheadOverlap||isBeyondNaturalOverheadTurn)continue; if(actual.id==="D"&&target.id==="I"&&degrees===30){/* The same fixture no longer represents a hand-on-waist D. */expect(matchTargetPose(pose,actual).accepted).toBe(false);continue;}expect(matchTargetPose(pose,target).accepted,`${actual.id}/${degrees}°/seed${seed} must not solve ${target.id}`).toBe(false);}
   }
  });
  it("maps raw front-facing anatomical sides into canonical mirrored-viewer scoring coordinates",()=>{
@@ -192,20 +196,22 @@ describe("pose matcher",()=>{
  it("keeps a finite, lightly cropped wrist in the matching pipeline without admitting a far crop",()=>{const target=POSE_TEMPLATES.find(template=>template.id==="I")!,raw=syntheticLandmarks(target);raw[15]={x:-.08,y:.5,visibility:.2};expect(matchPose(raw,16/9,target).valid).toBe(true);raw[15]={x:-.13,y:.5,visibility:.2};expect(matchPose(raw,16/9,target).valid).toBe(false);});
  it("holds a supported, lightly cropped pair of wrists through matching and solve timing",()=>{const target=POSE_TEMPLATES.find(template=>template.id==="I")!,raw=syntheticLandmarks(target);for(const index of [15,16])raw[index]={...raw[index],y:1.01,visibility:.2};const scored=matchPose(raw,16/9,target);expect(scored).toMatchObject({valid:true});const guarded=matchTargetPose(scored.pose!,target);expect(guarded).toMatchObject({accepted:true});let game:GameSession={...createSession(),status:"playing",startedAt:0,order:["ebi"],wordIndex:0,letterIndex:0,targetIndex:0};for(const at of [0,100,200,300,400])game=observe(game,at,guarded.accuracy,guarded.accepted);expect(game.successes).toHaveLength(1);});
  it("allows the edge tolerance but rejects genuinely cropped required joints",()=>{const raw=syntheticLandmarks(POSE_TEMPLATES[0]);raw[11].x=-.01;expect(matchPose(raw,1.5,POSE_TEMPLATES[0]).valid).toBe(true);raw[11].x=-.041;expect(matchPose(raw,1.5,POSE_TEMPLATES[0]).valid).toBe(false);raw[11].x=1.041;expect(matchPose(raw,1.5,POSE_TEMPLATES[0]).valid).toBe(false);});
- it("admits overhead A and O with natural feet without confusing their narrow and round arm shapes",()=>{
+ it("admits comfortable overlapping A/O apexes for either current target",()=>{
   const a=POSE_TEMPLATES.find(template=>template.id==="A")!,o=POSE_TEMPLATES.find(template=>template.id==="O")!;
   const aVariants: NormalizedPose[]=[
    {...a.pose,leftElbow:{x:-.55,y:-1.55},rightElbow:{x:.55,y:-1.55},leftWrist:{x:-.14,y:-2.08},rightWrist:{x:.14,y:-2.08},leftKnee:{x:-.25,y:1.16},rightKnee:{x:.25,y:1.16},leftAnkle:{x:-.25,y:2.22},rightAnkle:{x:.25,y:2.22}},
    {...a.pose,leftElbow:{x:-.7,y:-1.58},rightElbow:{x:.7,y:-1.58},leftWrist:{x:-.16,y:-2.12},rightWrist:{x:.16,y:-2.12},leftKnee:{x:-.48,y:1.16},rightKnee:{x:.48,y:1.16},leftAnkle:{x:-.62,y:2.22},rightAnkle:{x:.62,y:2.22}},
    {...a.pose,leftElbow:{x:-.52,y:-1.52},rightElbow:{x:.52,y:-1.52},leftWrist:{x:-.32,y:-2.03},rightWrist:{x:.32,y:-2.03},leftKnee:{x:-.16,y:1.18},rightKnee:{x:.16,y:1.18},leftAnkle:{x:-.16,y:2.24},rightAnkle:{x:.16,y:2.24}},
   ];
-  for(const variant of aVariants){const actual=normalizeLandmarks(rawFromNormalized(variant),16/9).pose!;expect(matchTargetPose(actual,a)).toMatchObject({valid:true,accepted:true});expect(matchTargetPose(noisyPose(actual,9),a)).toMatchObject({valid:true,accepted:true});expect(matchTargetPose(actual,o).accepted).toBe(false);}
-  const relaxedO={...o.pose,leftElbow:{x:-.95,y:-1.45},rightElbow:{x:.95,y:-1.45},leftWrist:{x:-.14,y:-2.1},rightWrist:{x:.14,y:-2.1},leftKnee:{x:-.35,y:1.2},rightKnee:{x:.35,y:1.2},leftAnkle:{x:-.55,y:2.24},rightAnkle:{x:.55,y:2.24}};
+  for(const variant of aVariants){const actual=normalizeLandmarks(rawFromNormalized(variant),16/9).pose!;expect(matchTargetPose(actual,a)).toMatchObject({valid:true,accepted:true});expect(matchTargetPose(noisyPose(actual,9),a)).toMatchObject({valid:true,accepted:true});}
+  const relaxedO={...o.pose,leftElbow:{x:-.78,y:-1.4},rightElbow:{x:.78,y:-1.4},leftWrist:{x:-.35,y:-1.78},rightWrist:{x:.35,y:-1.78},leftKnee:{x:-.35,y:1.2},rightKnee:{x:.35,y:1.2},leftAnkle:{x:-.55,y:2.24},rightAnkle:{x:.55,y:2.24}};
   const roundO=normalizeLandmarks(rawFromNormalized(relaxedO),16/9).pose!;
-  expect(matchTargetPose(roundO,o)).toMatchObject({valid:true,accepted:true});expect(matchTargetPose(roundO,a).accepted).toBe(false);
-  const intermediate={...relaxedO,leftElbow:{x:-.9,y:-1.48},rightElbow:{x:.9,y:-1.48}};
-  const ambiguous=normalizeLandmarks(rawFromNormalized(intermediate),16/9).pose!;
-  expect(matchTargetPose(ambiguous,a).accepted).toBe(false);expect(matchTargetPose(ambiguous,o).accepted).toBe(false);
+  expect(matchTargetPose(roundO,o)).toMatchObject({valid:true,accepted:true});expect(matchTargetPose(roundO,a)).toMatchObject({valid:true,accepted:true});
+  const shared={...a.pose,leftElbow:{x:-.9,y:-1.42},rightElbow:{x:.9,y:-1.42},leftWrist:{x:-.3,y:-1.85},rightWrist:{x:.3,y:-1.85},leftKnee:{x:-.22,y:1.2},rightKnee:{x:.22,y:1.2},leftAnkle:{x:-.22,y:2.25},rightAnkle:{x:.22,y:2.25}};
+  const overlapping=normalizeLandmarks(rawFromNormalized(shared),16/9).pose!;
+  expect(matchTargetPose(overlapping,a)).toMatchObject({valid:true,accepted:true});expect(matchTargetPose(overlapping,o)).toMatchObject({valid:true,accepted:true});
+  const handsDown=normalizeLandmarks(rawFromNormalized(POSE_TEMPLATES.find(template=>template.id==="I")!.pose),16/9).pose!;
+  expect(matchTargetPose(handsDown,a).accepted).toBe(false);expect(matchTargetPose(handsDown,o).accepted).toBe(false);
  });
  it("admits relaxed B and D side-arm shapes and S curves while keeping nearby letters separate",()=>{
   const byId=(id:string)=>POSE_TEMPLATES.find(template=>template.id===id)!;
@@ -223,9 +229,12 @@ describe("pose matcher",()=>{
   ];
   for(const variant of dVariants){const actual=normalizeLandmarks(rawFromNormalized(variant),16/9).pose!;expect(matchTargetPose(actual,d)).toMatchObject({accepted:true});expect(matchTargetPose(actual,b).accepted).toBe(false);expect(matchTargetPose(actual,i).accepted).toBe(false);}
   expect(matchTargetPose(normalizeLandmarks(rawFromNormalized(b.pose),16/9).pose!,d).accepted).toBe(false);
-  const relaxedS: NormalizedPose={...s.pose,leftElbow:{x:-1.05,y:-.48},leftWrist:{x:-.5,y:-1.35},rightElbow:{x:1,y:-.15},rightWrist:{x:.5,y:.38}};
-  const sActual=normalizeLandmarks(rawFromNormalized(relaxedS),16/9).pose!;
-  expect(matchTargetPose(sActual,s)).toMatchObject({accepted:true});expect(matchTargetPose(sActual,g).accepted).toBe(false);
+  const sVariants: NormalizedPose[]=[
+   {...s.pose,leftElbow:{x:-1.05,y:-.48},leftWrist:{x:-.5,y:-1.35},rightElbow:{x:.85,y:.05},rightWrist:{x:.35,y:.5}},
+   {...s.pose,rightElbow:{x:.95,y:-.05},rightWrist:{x:.5,y:.6}},
+   {...s.pose,rightElbow:{x:1,y:-.1},rightWrist:{x:.55,y:.48}},
+  ];
+  for(const variant of sVariants){const actual=normalizeLandmarks(rawFromNormalized(variant),16/9).pose!;expect(matchTargetPose(actual,s)).toMatchObject({accepted:true});for(const other of [g,byId("M"),byId("H")])expect(matchTargetPose(actual,other).accepted).toBe(false);}
  });
 });
 describe("sushi word catalog",()=>{

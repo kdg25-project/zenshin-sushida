@@ -7,7 +7,7 @@ export type MatcherResult = { valid: boolean; accuracy: number; jointScore: numb
 /** A valid camera pose may still be too similar to another ROMAJI silhouette to solve. */
 export type GuardedMatcherResult = MatcherResult & { accepted: boolean; nearestTemplateId?: string; margin?: number };
 export type GameConfig = { durationMs: number; threshold: number; holdMs: number; scoreVersion: string; rulesVersion: string; templateVersion: string; wordVersion: string; maxFrameGapMs: number };
-export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v12", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v8", maxFrameGapMs: 180 };
+export const DEFAULT_CONFIG: GameConfig = { durationMs: GAME_DURATION_MS, threshold: POSE_THRESHOLD, holdMs: POSE_HOLD_MS, scoreVersion: "score-v1", rulesVersion: "rules-v13", templateVersion: POSE_TEMPLATE_VERSION, wordVersion: "words-v8", maxFrameGapMs: 180 };
 
 const finite = (p: Point | undefined): p is Point => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -82,10 +82,10 @@ function hasHForearms(actual: NormalizedPose) {
   const left=limbDirection(actual.leftElbow,actual.leftWrist),right=limbDirection(actual.rightElbow,actual.rightWrist);
   return left.y>=.45&&right.y>=.45&&Math.abs(left.x)<=.55&&Math.abs(right.x)<=.55&&left.x<=.35&&right.x>=-.35;
 }
-/** M's lowered elbows and inward/downward forearms are intentionally distinct from H. */
+/** M's inward/downward forearms remain recognizable even with relaxed elbow height. */
 function hasMFoldedForearms(actual: NormalizedPose) {
   const left=limbDirection(actual.leftElbow,actual.leftWrist),right=limbDirection(actual.rightElbow,actual.rightWrist);
-  return actual.leftElbow.y-actual.leftShoulder.y>=.2&&actual.rightElbow.y-actual.rightShoulder.y>=.2&&left.y>=.4&&right.y>=.4&&left.x>=.4&&-right.x>=.4;
+  return actual.leftElbow.y-actual.leftShoulder.y>=-.1&&actual.rightElbow.y-actual.rightShoulder.y>=-.1&&left.y>=.3&&right.y>=.3&&left.x>=.25&&-right.x>=.25;
 }
 /** R needs an inward-folded right forearm and its characteristic outward right leg. */
 function hasRSignature(actual: NormalizedPose) {
@@ -121,23 +121,18 @@ function hasDWaistHand(actual: NormalizedPose) {
 /** A is an overhead triangle. Straight or inward elbows remain valid so legs never carry its identity. */
 function hasAOverheadTriangle(actual: NormalizedPose) {
   const leftForearm=limbDirection(actual.leftElbow,actual.leftWrist),rightForearm=limbDirection(actual.rightElbow,actual.rightWrist);
-  return actual.leftWrist.y-actual.leftShoulder.y<=-.55&&actual.rightWrist.y-actual.rightShoulder.y<=-.55&&Math.abs(actual.leftWrist.x-actual.rightWrist.x)<=1&&actual.leftElbow.x-actual.leftShoulder.x>=-.78&&actual.rightElbow.x-actual.rightShoulder.x<=.78&&leftForearm.x>=.05&&leftForearm.y<=-.05&&rightForearm.x<=-.05&&rightForearm.y<=-.05;
+  return actual.leftWrist.y-actual.leftShoulder.y<=-.45&&actual.rightWrist.y-actual.rightShoulder.y<=-.45&&Math.abs(actual.leftWrist.x-actual.rightWrist.x)<=1.25&&Math.abs(actual.leftElbow.x-actual.leftShoulder.x)<=.45&&Math.abs(actual.rightElbow.x-actual.rightShoulder.x)<=.45&&leftForearm.x>=-.15&&leftForearm.y<=0&&rightForearm.x<=.15&&rightForearm.y<=0;
 }
-/** O keeps the same overhead hands but opens both elbows outward into its rounded sides. */
+/** O is a comfortable overhead loop: its hands and elbows may overlap A's broad apex. */
 function hasOWideRoundArms(actual: NormalizedPose) {
   const leftForearm=limbDirection(actual.leftElbow,actual.leftWrist),rightForearm=limbDirection(actual.rightElbow,actual.rightWrist);
-  return actual.leftWrist.y-actual.leftShoulder.y<=-.85&&actual.rightWrist.y-actual.rightShoulder.y<=-.85&&Math.abs(actual.leftWrist.x-actual.rightWrist.x)<=.7&&actual.leftElbow.x-actual.leftShoulder.x<=-.44&&actual.rightElbow.x-actual.rightShoulder.x>=.44&&leftForearm.x>=.16&&leftForearm.y<=-.12&&rightForearm.x<=-.16&&rightForearm.y<=-.12;
+  return actual.leftWrist.y-actual.leftShoulder.y<=-.6&&actual.rightWrist.y-actual.rightShoulder.y<=-.6&&Math.abs(actual.leftWrist.x-actual.rightWrist.x)<=1.1&&actual.leftElbow.x-actual.leftShoulder.x<=-.25&&actual.rightElbow.x-actual.rightShoulder.x>=.25&&leftForearm.x>=.05&&leftForearm.y<=-.05&&rightForearm.x<=-.05&&rightForearm.y<=-.05;
 }
 /** S rises inward on the left and folds inward/down on the right, unlike G's outward right hook. */
 function hasSAsymmetricForearms(actual: NormalizedPose) {
   return actual.leftElbow.y-actual.leftShoulder.y>=.15&&actual.rightElbow.y-actual.rightShoulder.y>=.15&&actual.leftWrist.y<=actual.leftElbow.y-.2&&actual.rightWrist.y>=actual.rightElbow.y+.2&&actual.leftWrist.x-actual.leftElbow.x>=.22&&actual.rightElbow.x-actual.rightWrist.x>=.22;
 }
-/** Only a clearly narrow A may ignore O's score; intermediate arm widths remain ambiguous. */
-function hasDistinctAOverheadTriangle(actual: NormalizedPose) {
-  return hasAOverheadTriangle(actual)&&actual.leftElbow.x-actual.leftShoulder.x>=-.38&&actual.rightElbow.x-actual.rightShoulder.x<=.38;
-}
 function rivalIsEligible(actual: NormalizedPose, targetId: string, rivalId: string) {
-  if(targetId==="M"&&rivalId==="H"&&hasMFoldedForearms(actual)) return hasHForearms(actual);
   if(targetId==="E"&&rivalId==="R"&&hasEOutwardRightForearm(actual)) return hasRSignature(actual);
   if(targetId==="E"&&rivalId==="F"&&hasEOutwardRightForearm(actual)) return false;
   if(targetId==="E"&&rivalId==="D"&&hasEOutwardRightForearm(actual)) return false;
@@ -150,13 +145,20 @@ function rivalIsEligible(actual: NormalizedPose, targetId: string, rivalId: stri
   if(targetId==="K"&&(rivalId==="F"||rivalId==="Z")&&hasKSignature(actual)) return false;
   if(targetId==="W"&&["H","S","T","U"].includes(rivalId)&&hasWOutwardForearms(actual)) return false;
   if(targetId==="W"&&rivalId==="B"&&hasWOutwardForearms(actual)) return false;
-  if(targetId==="A"&&rivalId==="O"&&hasDistinctAOverheadTriangle(actual)) return false;
-  if(targetId==="O"&&rivalId==="A"&&hasOWideRoundArms(actual)) return false;
   if(targetId==="S"&&rivalId==="G"&&hasSAsymmetricForearms(actual)) return false;
   return true;
 }
 function targetHasRequiredSignature(actual: NormalizedPose, targetId: string) {
-  return (targetId!=="H"||hasHForearms(actual))&&(targetId!=="R"||hasRSignature(actual))&&(targetId!=="B"||hasBOpenSideForearm(actual))&&(targetId!=="I"||hasIVerticalDownArms(actual))&&(targetId!=="K"||hasKSignature(actual))&&(targetId!=="D"||hasDWaistHand(actual))&&(targetId!=="A"||hasAOverheadTriangle(actual))&&(targetId!=="O"||hasOWideRoundArms(actual))&&(targetId!=="S"||hasSAsymmetricForearms(actual));
+  return (targetId!=="H"||hasHForearms(actual))&&(targetId!=="R"||hasRSignature(actual))&&(targetId!=="B"||hasBOpenSideForearm(actual))&&(targetId!=="I"||hasIVerticalDownArms(actual))&&(targetId!=="K"||hasKSignature(actual))&&(targetId!=="D"||hasDWaistHand(actual))&&(targetId!=="A"||hasAOverheadTriangle(actual))&&(targetId!=="O"||hasOWideRoundArms(actual))&&(targetId!=="M"||hasMFoldedForearms(actual))&&(targetId!=="S"||hasSAsymmetricForearms(actual));
+}
+/**
+ * A, O, and M deliberately favor a recognizable target silhouette over a
+ * fractional nearest-letter lead. They are the comfortable, similar shapes
+ * in this set; the basic signature remains mandatory so unrelated poses do
+ * not gain this allowance.
+ */
+function targetAllowsNearShape(actual: NormalizedPose, targetId: string) {
+  return (targetId==="A"&&hasAOverheadTriangle(actual))||(targetId==="O"&&hasOWideRoundArms(actual))||(targetId==="M"&&hasMFoldedForearms(actual));
 }
 
 /**
@@ -169,7 +171,9 @@ export function matchTargetPose(actual: NormalizedPose, template: PoseTemplate, 
   if (!target.valid) return { ...target, accepted:false };
   const nearest = POSE_TEMPLATES.filter(candidate=>candidate.id!==template.id&&rivalIsEligible(actual,template.id,candidate.id)).map(candidate=>({ id:candidate.id, score:matchNormalizedPose(actual,candidate).accuracy })).reduce((best,current)=>current.score>best.score?current:best,{id:"",score:-Infinity});
   const margin=target.accuracy-nearest.score;
-  return { ...target, accepted:target.accuracy>=threshold&&margin>=poseMatchMargin(template.id)&&targetHasRequiredSignature(actual,template.id), nearestTemplateId:nearest.id||undefined, margin };
+  const hasRequiredSignature=targetHasRequiredSignature(actual,template.id);
+  const passesRivalGuard=targetAllowsNearShape(actual,template.id)||margin>=poseMatchMargin(template.id);
+  return { ...target, accepted:target.accuracy>=threshold&&hasRequiredSignature&&passesRivalGuard, nearestTemplateId:nearest.id||undefined, margin };
 }
 
 export type GameStatus = "idle"|"camera-check"|"countdown"|"playing"|"result";
