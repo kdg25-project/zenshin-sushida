@@ -5,7 +5,7 @@ import { Miniflare } from "miniflare";
 import { encodePreview } from "../lib/booth-preview";
 
 type Socket = { accept: () => void; close: (code?: number, reason?: string) => void; send: (message: string|ArrayBuffer) => void; addEventListener: (type: "message" | "close", listener: (event: { data?: string|ArrayBuffer; code?: number }) => void) => void };
-type Snapshot = { revision: number; round: number; targetIndex:number; wordIndex: number; letterIndex:number; phase: "menu" | "camera" | "ready" | "countdown" | "playing" | "result"; name: string; cameraMessage: string; remaining: number; score: number; currentSushi: string; currentLetter: string; rankingEligible: boolean; submitted: boolean; registrationMessage: string; hostSeenAt: number; controllerCount: number; playerTracking:string; selectionRequired:boolean;selectedMarkerId?:number;markerTrackingPhase?:"unselected"|"tracking"|"marker-occluded"|"reconfirm-required"|"duplicate"|"ambiguous";markerMessage?:string;markerSelectionGeneration?:number;reconfirmationRequired?:boolean };
+type Snapshot = { revision: number; round: number; targetIndex:number; wordIndex: number; letterIndex:number; phase: "menu" | "camera" | "ready" | "countdown" | "playing" | "result"; name: string; cameraMessage: string; remaining: number; score: number; currentSushi: string; currentLetter: string; rankingEligible: boolean; submitted: boolean; registrationMessage: string; hostSeenAt: number; controllerCount: number; playerTracking:string; selectionRequired:boolean;selectedMarkerId?:number;markerTrackingPhase?:"unselected"|"tracking"|"marker-occluded"|"reconfirm-required"|"duplicate"|"ambiguous";markerMessage?:string;markerSelectionGeneration?:number;reconfirmationRequired?:boolean;diagnostics?:{lines:string[];updatedAt:number} };
 
 const password = "festival-test-password";
 const hostToken = "h".repeat(48);
@@ -92,6 +92,53 @@ describe("booth WebSocket coordination", () => {
       host.send(JSON.stringify({ type: "ack", id: "set-name-request-0001", status: "done", message: "名前を更新しました" }));
       expect(await firstInbox.nextType("command-result")).toMatchObject({ id: "set-name-request-0001", status: "done" });
       expect(await secondInbox.nextType("command-result")).toMatchObject({ id: "set-name-request-0001", status: "done" });
+    } finally { await mf.dispose(); }
+  });
+
+  it("forwards bounded host diagnostics only through authenticated state and rejects malformed diagnostics", async () => {
+    const mf = await worker();
+    try {
+      const { roomId } = await createRoom(mf);
+      await joinRoom(mf, controllerOne);
+      const host = await connect(mf, roomId), hostInbox = messages(host);
+      const controller = await connect(mf, roomId), controllerInbox = messages(controller);
+      await authenticate(host, hostInbox, hostToken); await authenticate(controller, controllerInbox, controllerOne);
+      const escaped=`"\\\u0000`.repeat(40),diagnostics={lines:[...Array.from({length:6},()=>escaped),`worker error: ${`"\\\u0000`.repeat(35)}`],updatedAt:123},encoded=JSON.stringify({type:"snapshot",snapshot:snapshot({diagnostics})});
+      expect(encoded.length).toBeGreaterThan(2_000);expect(encoded.length).toBeLessThanOrEqual(6_500);
+      host.send(encoded);
+      expect((await nextState(controllerInbox,value=>value.diagnostics?.updatedAt===123)).diagnostics).toEqual(diagnostics);
+      const closed=new Promise<{code?:number}>(resolve=>host.addEventListener("close",resolve));
+      host.send(JSON.stringify({type:"snapshot",snapshot:snapshot({diagnostics:{lines:["x".repeat(121)],updatedAt:124}})}));
+      expect((await closed).code).toBe(1008);
+    } finally { await mf.dispose(); }
+  });
+
+  it("keeps the extended snapshot envelope exclusive to the active host and caps it", async () => {
+    const mf = await worker();
+    try {
+      const { roomId } = await createRoom(mf);
+      await joinRoom(mf, controllerOne);
+      const host = await connect(mf, roomId), hostInbox = messages(host);
+      const controller = await connect(mf, roomId), controllerInbox = messages(controller);
+      await authenticate(host, hostInbox, hostToken); await authenticate(controller, controllerInbox, controllerOne);
+      const controllerClosed=new Promise<{code?:number}>(resolve=>controller.addEventListener("close",resolve));
+      controller.send(JSON.stringify({type:"ping",padding:"x".repeat(2_100)}));
+      expect((await controllerClosed).code).toBe(1008);
+      const hostClosed=new Promise<{code?:number}>(resolve=>host.addEventListener("close",resolve));
+      host.send(JSON.stringify({type:"ack",padding:"x".repeat(2_100)}));
+      expect((await hostClosed).code).toBe(1008);
+    } finally { await mf.dispose(); }
+  });
+
+  it("rejects an active-host snapshot beyond the bounded diagnostic envelope", async () => {
+    const mf = await worker();
+    try {
+      const { roomId } = await createRoom(mf);
+      const host = await connect(mf, roomId), hostInbox = messages(host);
+      await authenticate(host, hostInbox, hostToken);
+      const closed=new Promise<{code?:number}>(resolve=>host.addEventListener("close",resolve));
+      host.send(JSON.stringify({type:"snapshot",snapshot:{...snapshot(),padding:"x".repeat(6_500)}}));
+      expect((await closed).code).toBe(1008);
     } finally { await mf.dispose(); }
   });
 
