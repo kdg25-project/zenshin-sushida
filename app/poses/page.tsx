@@ -1,5 +1,6 @@
 import Link from "next/link";
 import styles from "./poses.module.css";
+import { FullscreenShortcut } from "../../components/FullscreenShortcut";
 import { PoseInfiniteList } from "../../components/PoseInfiniteList";
 
 export const metadata = {
@@ -10,6 +11,7 @@ export const metadata = {
 export default function PosesPage() {
   return (
     <main className={styles.page}>
+      <FullscreenShortcut />
       <header className={styles.header}>
         <div className={styles.heading}>
           <img className={styles.logo} src="/assets/illustrator-v4-menu/menu-v4-title-source.png" alt="全身寿司打" />

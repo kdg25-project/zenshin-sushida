@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FullscreenShortcut } from "../../components/FullscreenShortcut";
+import { rankingPageForRefresh, RankingRefreshController, type RankingRefreshReason } from "../../lib/ranking-refresh";
 import styles from "./ranking.module.css";
 
 const ROWS_PER_PAGE = 10;
@@ -47,35 +49,57 @@ export default function RankingClient() {
   const [page, setPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string>();
-  const requestId = useRef(0);
+  const rankRefreshRef = useRef<RankingRefreshController<RankingEntry> | undefined>(undefined);
 
-  const refresh = useCallback(async (manual = false) => {
-    const id = ++requestId.current;
-    setError(undefined);
-    setRefreshing(true);
-    if (!entries.length) setStatus("loading");
-
-    try {
-      const response = await fetch("/api/leaderboard", { cache: "no-store" });
-      if (!response.ok) throw new Error("ランキングを読み込めませんでした。");
-      const nextEntries = parseEntries(await response.json());
-      if (id !== requestId.current) return;
+  if (!rankRefreshRef.current) rankRefreshRef.current = new RankingRefreshController(async (signal) => {
+    const response = await fetch("/api/leaderboard", { cache: "no-store", signal });
+    if (!response.ok) throw new Error("ランキングを読み込めませんでした。");
+    return parseEntries(await response.json());
+  }, {
+    begin: (reason: RankingRefreshReason) => {
+      setError(undefined);
+      setRefreshing(true);
+      setStatus("loading");
+      if (reason === "manual") setPage(0);
+    },
+    rows: (nextEntries, reason) => {
       setEntries(nextEntries);
       setStatus("ready");
-      setPage((current) => manual ? 0 : Math.min(current, Math.max(0, Math.ceil(nextEntries.length / ROWS_PER_PAGE) - 1)));
-    } catch {
-      if (id !== requestId.current) return;
-      setStatus((current) => entries.length ? current : "error");
-      setError(entries.length ? "更新できませんでした。表示中のランキングをそのまま表示しています。" : "ランキングを読み込めませんでした。通信を確認して、もう一度お試しください。");
-    } finally {
-      if (id === requestId.current) setRefreshing(false);
-    }
-  }, [entries.length]);
+      setRefreshing(false);
+      setPage((current) => rankingPageForRefresh(current, nextEntries.length, reason));
+    },
+    failure: (reason, hasSnapshot) => {
+      setRefreshing(false);
+      if (reason === "background" && hasSnapshot) return;
+      setStatus("error");
+      setError(hasSnapshot ? "更新できませんでした。表示中のランキングをそのまま表示しています。" : "ランキングを読み込めませんでした。通信を確認して、もう一度お試しください。");
+    },
+  });
+
+  const refresh = useCallback(() => rankRefreshRef.current!.refreshNow(), []);
 
   useEffect(() => {
-    void refresh();
-    // The first request intentionally runs once. Subsequent reloads are user-driven.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const controller = rankRefreshRef.current!;
+    const onVisibility = () => {
+      if (document.hidden) {
+        setRefreshing(false);
+        controller.pause();
+      } else {
+        controller.resume();
+      }
+    };
+    const onFocus = () => {
+      if (!document.hidden) controller.resume();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    controller.start(!document.hidden);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+      controller.stop();
+    };
   }, []);
 
   const pageCount = Math.max(1, Math.ceil(entries.length / ROWS_PER_PAGE));
@@ -84,6 +108,7 @@ export default function RankingClient() {
 
   return (
     <main className={styles.page} aria-busy={isInitialLoading || undefined}>
+      <FullscreenShortcut />
       <header className={styles.header}>
         <div className={styles.brand}>
           <img className={styles.logo} src="/assets/illustrator-v4-menu/menu-v4-title-source.png" alt="全身寿司打" />
@@ -99,7 +124,7 @@ export default function RankingClient() {
             <h1 id="ranking-title">ランキング</h1>
             <p className={styles.caption}>いままでの上位40件</p>
           </div>
-          <button className={styles.refreshButton} type="button" onClick={() => void refresh(true)} disabled={refreshing}>
+          <button className={styles.refreshButton} type="button" onClick={() => void refresh()} disabled={refreshing}>
             {refreshing ? "更新中…" : "ランキングを更新"}
           </button>
         </div>
